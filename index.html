@@ -258,22 +258,36 @@
   .hl-pink   { background: var(--hl-pink); }
 
   /* ---------- Two-page spread (compare + tab view) ---------- */
+  /* Two panes must sit side by side even on a narrow phone -- that's the
+     whole point of the facing-page look. A flex-basis in px plus wrap made
+     them stack below ~520px, so panes are sized as a fraction instead and
+     never wrap. Three or more passages (possible in a tab) scroll
+     horizontally with snap, so each stays readable rather than shrinking
+     to nothing. */
   .spread {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0;
     border: 1px solid var(--line);
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
     background: var(--panel);
     margin-bottom: 14px;
   }
+  .spread::-webkit-scrollbar { display: none; }
   .page {
-    flex: 1 1 260px;
+    flex: 1 0 50%;
+    max-width: 50%;
     min-width: 0;
-    padding: 16px 15px;
+    padding: 15px 13px;
     position: relative;
+    scroll-snap-align: start;
   }
+  /* A single passage gets the whole width rather than half a page. */
+  .spread > .page:only-child { flex-basis: 100%; max-width: 100%; }
   .page + .page {
     border-left: 1px solid var(--line);
     box-shadow: inset 6px 0 10px -8px var(--spine-a);
@@ -602,8 +616,12 @@
     font-size: 14px; margin-bottom: 16px;
   }
 
+  @media (max-width: 430px) {
+    .page { padding: 13px 11px; }
+    .page .verseflow { font-size: 13.5px; line-height: 1.55; }
+    .page-title { font-size: 14px; }
+  }
   @media (max-width: 380px) {
-    .page .verseflow { font-size: 14.5px; }
     #wordmark { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -936,7 +954,7 @@
     "2 Thessalonians": ["2 thessalonians", "2thessalonians", "2 thess", "2thess", "2 th", "2th"],
     "1 Timothy": ["1 timothy", "1timothy", "1 tim", "1tim", "1 ti", "1ti"],
     "2 Timothy": ["2 timothy", "2timothy", "2 tim", "2tim", "2 ti", "2ti"],
-    Titus: ["titus", "tit", "ti"], Philemon: ["philemon", "philem", "phm", "pm"], Hebrews: ["hebrews", "heb"],
+    Titus: ["titus", "tit", "ti"], Philemon: ["philemon", "philem", "phlm", "phm", "pm"], Hebrews: ["hebrews", "heb"],
     James: ["james", "jas", "jm"], "1 Peter": ["1 peter", "1peter", "1 pet", "1pet", "1 pe", "1pe"],
     "2 Peter": ["2 peter", "2peter", "2 pet", "2pet", "2 pe", "2pe"],
     "1 John": ["1 john", "1john", "1 jn", "1jn", "1 jo", "1jo"],
@@ -1310,44 +1328,87 @@
     return null;
   }
 
+  // openbible.info's cross-reference file is a TSV whose references look like
+  // "Gen.1.1" or "Gen.1.1-Gen.1.5" (OSIS-style abbreviations, dot separated).
+  // Returns { book, chapter, verseStart, verseEnd } or null.
+  function parseOpenBibleRef(token) {
+    const t = String(token || "").trim();
+    if (!t) return null;
+    const side = (part) => {
+      const m = String(part).trim().match(/^([1-3]?[A-Za-z]+)\.(\d{1,3})\.(\d{1,3})$/);
+      if (!m) return null;
+      const book = normalizeBookName(m[1]);
+      if (!book) return null;
+      return { book, chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) };
+    };
+    const parts = t.split("-");
+    const a = side(parts[0]);
+    if (!a) return null;
+    if (parts.length === 1) {
+      return { book: a.book, chapter: a.chapter, verseStart: a.verse, verseEnd: a.verse };
+    }
+    const b = side(parts[1]);
+    // A range spanning books or chapters is stored as its opening verse only,
+    // since a tab shows a single contiguous passage per pane.
+    if (!b || b.book !== a.book || b.chapter !== a.chapter) {
+      return { book: a.book, chapter: a.chapter, verseStart: a.verse, verseEnd: a.verse };
+    }
+    return { book: a.book, chapter: a.chapter, verseStart: a.verse,
+      verseEnd: Math.max(a.verse, b.verse) };
+  }
+
+  // The scrollmapper repo restructured its branches and the JSON path this
+  // once used now 404s, so try known locations in turn and use whichever
+  // responds. All carry the same openbible.info TSV.
+  const XREF_URLS = [
+    "https://raw.githubusercontent.com/revans/bible_databases/master/cross_references.txt",
+    "https://raw.githubusercontent.com/joeldhenry/bible_databases/master/cross_references.txt",
+    "https://raw.githubusercontent.com/scrollmapper/bible_databases/2024/cross_references.txt",
+  ];
+
   async function downloadCrossReferences(onProgress) {
-    const url = "https://raw.githubusercontent.com/scrollmapper/bible_databases/master/formats/json/cross_references.json";
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const rows = Array.isArray(data) ? data
-      : (data.cross_references && Array.isArray(data.cross_references)) ? data.cross_references
-      : (Array.isArray(Object.values(data)[0]) ? Object.values(data)[0] : []);
-    if (!rows.length) throw new Error("No cross-reference rows found in the downloaded file");
+    let text = null, lastErr = null;
+    for (const url of XREF_URLS) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
+        text = await res.text();
+        break;
+      } catch (e) { lastErr = e; }
+    }
+    if (text === null) throw new Error("Couldn't reach any known copy of the cross-reference file" + (lastErr ? ` (${lastErr.message})` : ""));
+
+    const lines = text.split(/\r?\n/);
+    if (lines.length < 10) throw new Error("Cross-reference file looks empty or truncated");
     const db = await openDB();
-    const BATCH = 2000;
+    const BATCH = 4000;
     let kept = 0;
-    for (let i = 0; i < rows.length; i += BATCH) {
-      const chunk = rows.slice(i, i + BATCH);
+    for (let i = 0; i < lines.length; i += BATCH) {
+      const chunk = lines.slice(i, i + BATCH);
       await new Promise((resolve, reject) => {
         const tx = db.transaction("xrefs", "readwrite");
         const store = tx.objectStore("xrefs");
-        for (const r of chunk) {
-          const fromBook = normalizeBookName(r.from_book);
-          const toBook = normalizeBookName(r.to_book);
-          const fromChapter = parseInt(r.from_chapter, 10);
-          const fromVerse = parseInt(r.from_verse, 10);
-          if (!fromBook || !toBook || !fromChapter || !fromVerse) continue;
+        for (const line of chunk) {
+          if (!line || !line.trim()) continue;
+          const cols = line.split("\t");
+          if (cols.length < 2) continue;
+          const from = parseOpenBibleRef(cols[0]);   // header row fails here
+          const to = parseOpenBibleRef(cols[1]);
+          if (!from || !to) continue;
           store.put({
-            fromKey: `${fromBook}|${fromChapter}|${fromVerse}`,
-            toBook, toChapter: parseInt(r.to_chapter, 10),
-            toVerseStart: parseInt(r.to_verse_start, 10) || parseInt(r.to_verse, 10) || null,
-            toVerseEnd: parseInt(r.to_verse_end, 10) || parseInt(r.to_verse_start, 10) || parseInt(r.to_verse, 10) || null,
-            votes: parseInt(r.votes, 10) || 0,
+            fromKey: `${from.book}|${from.chapter}|${from.verseStart}`,
+            toBook: to.book, toChapter: to.chapter,
+            toVerseStart: to.verseStart, toVerseEnd: to.verseEnd,
+            votes: parseInt(cols[2], 10) || 0,
           });
           kept++;
         }
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error);
       });
-      onProgress(Math.min(i + BATCH, rows.length), rows.length);
+      onProgress(Math.min(i + BATCH, lines.length), lines.length);
     }
-    if (!kept) throw new Error("Downloaded the file, but couldn't match any book names \u2014 the source format may have changed");
+    if (!kept) throw new Error("Downloaded the file, but couldn't parse any references \u2014 the source format may have changed");
     await setMeta("xrefs", { downloaded: true, count: kept, downloadedAt: Date.now() });
   }
 
@@ -1586,34 +1647,91 @@
     }
     return -1;
   }
-  const TOPIC_COLUMNS = ["topic", "naves_topic", "topic_name", "subject", "heading", "name", "entry"];
-  const SUBTOPIC_COLUMNS = ["subtopic", "sub_topic", "subheading", "detail", "description", "text"];
-  const REF_COLUMNS = ["reference", "verse", "scripture", "verse_reference", "ref", "citation", "osis"];
+  // The real columns are: section, subject, entry. There is NO reference
+  // column -- Nave's keeps its citations inside the entry prose, e.g.
+  //   subject: "FAITH"   entry: "Defined, Heb. 11:1; Rom. 10:17."
+  // so references are scanned out of the text instead of read from a column.
+  const TOPIC_COLUMNS = ["subject", "topic", "naves_topic", "topic_name", "heading", "name"];
+  const SECTION_COLUMNS = ["section", "subtopic", "sub_topic", "subheading", "category"];
+  const ENTRY_COLUMNS = ["entry", "text", "body", "detail", "description", "content"];
+
+  // Scans free text for every scripture reference it can recognize.
+  // Handles abbreviations with periods ("1 Pet."), hyphen and en-dash ranges,
+  // and semicolon lists that omit the book ("Rom. 10:17; 11:2" -> both Romans).
+  const PROSE_REF_RE = /(?:([1-3]\s*)?([A-Za-z]{2,20})\.?\s*)?(\d{1,3})\s*:\s*(\d{1,3})(?:\s*[-\u2013]\s*(\d{1,3}))?/g;
+
+  function extractReferences(text) {
+    const out = [];
+    if (!text) return out;
+    let lastBook = null, m;
+    PROSE_REF_RE.lastIndex = 0;
+    while ((m = PROSE_REF_RE.exec(String(text))) !== null) {
+      const num = m[1], word = m[2], ch = m[3], v1 = m[4], v2 = m[5];
+      let book = null;
+      if (word) {
+        book = normalizeBookName((num ? num.trim() + " " : "") + word);
+        if (!book && num) book = normalizeBookName(word);
+      }
+      if (!book) {
+        if (!word) book = lastBook;  // bare "11:2" continues the last book
+        else continue;               // unrecognized word: not a reference
+      }
+      if (!book) continue;
+      lastBook = book;
+      const chapter = parseInt(ch, 10);
+      const verseStart = parseInt(v1, 10);
+      if (!chapter || !verseStart) continue;
+      let verseEnd = v2 ? parseInt(v2, 10) : verseStart;
+      // A malformed range ("5:10-2") is usually a typo or truncation; keep it
+      // as a single verse rather than discarding a real citation.
+      if (verseEnd < verseStart) verseEnd = verseStart;
+      out.push({ book, chapter, verseStart, verseEnd });
+    }
+    const seen = new Set();
+    return out.filter((r) => {
+      const k = `${r.book}|${r.chapter}|${r.verseStart}|${r.verseEnd}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
 
   function buildTopics(csvRows) {
     if (!csvRows.length) throw new Error("Empty file");
     const headers = csvRows[0];
     const ti = pickColumn(headers, TOPIC_COLUMNS);
-    const ri = pickColumn(headers, REF_COLUMNS);
-    const si = pickColumn(headers, SUBTOPIC_COLUMNS);
+    const ei = pickColumn(headers, ENTRY_COLUMNS);
+    const si = pickColumn(headers, SECTION_COLUMNS);
     if (ti === -1) throw new Error("Couldn't find a topic column (headers: " + headers.join(", ") + ")");
-    if (ri === -1) throw new Error("Couldn't find a reference column (headers: " + headers.join(", ") + ")");
+    if (ei === -1) throw new Error("Couldn't find an entry column (headers: " + headers.join(", ") + ")");
+
     const byTopic = new Map();
     for (let i = 1; i < csvRows.length; i++) {
-      const r = csvRows[i];
-      const topic = (r[ti] || "").trim();
-      const rawRef = (r[ri] || "").trim();
-      if (!topic || !rawRef) continue;
-      const sub = si !== -1 ? (r[si] || "").trim() : "";
+      const row = csvRows[i];
+      const topic = (row[ti] || "").trim();
+      const entry = (row[ei] || "").trim();
+      if (!topic || !entry) continue;
+      const refs = extractReferences(entry);
+      if (!refs.length) continue;   // an entry with no citations isn't useful here
+      // Use the entry text itself as the grouping label, trimmed to something
+      // readable -- it's what Nave's actually prints above each list.
+      let label = entry.replace(/\s+/g, " ");
+      // Cut at the start of the first citation (book abbreviation included,
+      // not just the digits) so the label reads "Defined" rather than
+      // "Defined, Heb.".
+      const finder = new RegExp(PROSE_REF_RE.source);
+      const firstRef = finder.exec(label);
+      if (firstRef && firstRef.index > 0) {
+        label = label.slice(0, firstRef.index).replace(/[,;:.\s]+$/, "");
+      }
+      if (label.length > 90) label = label.slice(0, 90).trim() + "\u2026";
+      const section = si !== -1 ? (row[si] || "").trim() : "";
       const key = topic.toLowerCase();
-      if (!byTopic.has(key)) byTopic.set(key, { topic, subtopics: new Map() });
-      const entry = byTopic.get(key);
-      if (!entry.subtopics.has(sub)) entry.subtopics.set(sub, []);
-      entry.subtopics.get(sub).push(rawRef);
+      if (!byTopic.has(key)) byTopic.set(key, { topic, groups: [] });
+      byTopic.get(key).groups.push({ label: label || section, refs });
     }
     return Array.from(byTopic.entries()).map(([key, v]) => ({
-      key, topic: v.topic,
-      subtopics: Array.from(v.subtopics.entries()).map(([label, refs]) => ({ label, refs })),
+      key, topic: v.topic, subtopics: v.groups,
     }));
   }
 
@@ -1622,7 +1740,7 @@
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     const topics = buildTopics(parseCsv(text));
-    if (!topics.length) throw new Error("No topics found in the downloaded file");
+    if (!topics.length) throw new Error("No topics with usable references found in the downloaded file");
     const db = await openDB();
     const BATCH = 500;
     let refCount = 0;
@@ -1632,29 +1750,14 @@
         const tx = db.transaction("topics", "readwrite");
         const store = tx.objectStore("topics");
         for (const t of chunk) {
-          // Normalize each raw reference through the app's own parser so
-          // topical refs use the identical shape as tabs and cross-refs.
-          const subtopics = t.subtopics.map((st) => {
-            const refs = [];
-            for (const raw of st.refs) {
-              const p = parseReference(raw);
-              if (p) {
-                refs.push({ book: p.book.name, chapter: p.chapter,
-                  verseStart: p.verseStart, verseEnd: p.verseEnd });
-                refCount++;
-              }
-            }
-            return { label: st.label, refs };
-          }).filter((st) => st.refs.length);
-          if (!subtopics.length) continue;
-          store.put({ key: t.key, topic: t.topic, subtopics });
+          for (const g of t.subtopics) refCount += g.refs.length;
+          store.put({ key: t.key, topic: t.topic, subtopics: t.subtopics });
         }
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error);
       });
       onProgress(Math.min(i + BATCH, topics.length), topics.length);
     }
-    if (!refCount) throw new Error("Topics loaded but no references could be parsed — the reference format may differ from what's expected");
     await setMeta("naves", { downloaded: true, topics: topics.length, refs: refCount, downloadedAt: Date.now() });
     return { topics: topics.length, refs: refCount };
   }

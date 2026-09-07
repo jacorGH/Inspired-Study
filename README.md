@@ -157,7 +157,7 @@ All scripture text is public domain. Reference works likewise, with one dataset 
 | Strong's tagged KJV / ASV | [bolls.life](https://bolls.life/) whole-translation JSON | Public domain texts |
 | Strong's dictionaries | [openscriptures/strongs](https://github.com/openscriptures/strongs) | Public domain |
 | Hebrew/Greek lexicon | Brown-Driver-Briggs / Thayer's via [bolls.life](https://bolls.life/) | Public domain |
-| Cross-references (TSK) | [scrollmapper/bible_databases](https://github.com/scrollmapper/bible_databases), from [openbible.info](https://www.openbible.info/labs/cross-references/) | Public domain |
+| Cross-references (TSK) | `cross_references.txt` from [openbible.info](https://www.openbible.info/labs/cross-references/), mirrored in the `bible_databases` repos | Public domain |
 | Nave's Topical Bible | [BradyStephenson/bible-data](https://github.com/BradyStephenson/bible-data) | **CC BY 4.0** |
 
 **Attribution note:** the Nave's dataset is CC BY 4.0, which *requires* credit. The app displays it in the Library card. Keep that attribution if you fork or redistribute.
@@ -200,7 +200,9 @@ Some notes for anyone modifying it:
 
 **Tagged text downloaded but tapping words does nothing.** The Library card reports what it found. If it says *"no Strong's tags were found"*, the source text isn't tagged in a format the parser recognises — try the other translation, or check the source URL in `BOLLS_TAGGED`.
 
-**Nave's download fails with a column error.** The message names the actual CSV headers it found. Add the relevant one to `TOPIC_COLUMNS` or `REF_COLUMNS` at the top of that module.
+**Nave's download fails with a column error.** The message names the actual CSV headers it found. Add the relevant one to `TOPIC_COLUMNS` or `ENTRY_COLUMNS` at the top of that module. Note that Nave's has no reference column — citations are scanned out of the `entry` prose by `extractReferences`, so a topic whose entry contains no recognisable citation is skipped by design.
+
+**Cross-references download fails.** `downloadCrossReferences` tries several known mirrors of `cross_references.txt` in turn and reports failure only if all are unreachable. If that happens, add a working URL to `XREF_URLS`.
 
 **Search returns nothing.** Search only covers text stored on your device. Download a translation under Library, or read a few chapters first.
 
