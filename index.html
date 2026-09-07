@@ -128,13 +128,19 @@
     padding-right: 12px;
     padding-bottom: 10px;
   }
+  #menuBtn {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 7px;
+    background: none; border: none; padding: 6px 2px;
+    font-size: 16px; color: var(--gilt-soft);
+  }
+  #menuBtn.on { color: var(--page); }
   #wordmark {
     font-family: var(--font-display);
     font-weight: 600;
     font-size: 17px;
     letter-spacing: 0.2px;
     color: var(--gilt-soft);
-    flex: 0 0 auto;
   }
   #refBtn {
     flex: 1 1 auto;
@@ -634,7 +640,7 @@
 <div id="app">
 
   <div id="topbar">
-    <div id="wordmark">Berea</div>
+    <button id="menuBtn" type="button" title="Library, help &amp; downloads">☰<span id="wordmark">Berea</span></button>
     <button id="refBtn" type="button">Loading…</button>
     <select id="trBadge"></select>
   </div>
@@ -659,6 +665,7 @@
         <button data-mode="verses" class="active" type="button">Verses</button>
         <button data-mode="tabs" type="button">Tabs</button>
         <button data-mode="topics" type="button">Topics</button>
+        <button data-mode="words" type="button">Words</button>
       </div>
       <form id="searchForm">
         <select id="searchTr"></select>
@@ -667,6 +674,9 @@
       </form>
       <form id="tabSearchForm" style="display:none">
         <input id="tabSearchInput" type="text" placeholder="Search your tabs by name or reference…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+      </form>
+      <form id="wordSearchForm" style="display:none">
+        <input id="wordSearchInput" type="text" placeholder="An English word or Strong's number — mercy, agape, H2617…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
       </form>
       <form id="topicSearchForm" style="display:none">
         <input id="topicSearchInput" type="text" placeholder="Search topics — faith, forgiveness, prayer…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
@@ -698,6 +708,7 @@
       <div class="testament-label" style="margin-top:14px">Tap-a-word text</div>
       <div class="hint">Download a Strong's-tagged Bible to tap any word while reading and see the Hebrew or Greek behind it. Then use the "Strong's" button at the top of the Read view. One large download each — best on Wi-Fi.</div>
       <div id="taggedCards"></div>
+      <div id="concordanceCard"></div>
       <form id="strongsSearchForm" style="display:flex;gap:8px;margin-top:10px">
         <input id="strongsSearchInput" type="text" placeholder="Search a word, transliteration, or number (e.g. agape, H7225)…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
         <button class="dl" type="submit">Go</button>
@@ -721,6 +732,10 @@
       <div id="apologeticsList"></div>
     </section>
 
+    <section id="view-journal" class="view">
+      <div id="journalBody"></div>
+    </section>
+
     <section id="view-study" class="view">
       <div id="studyBody"></div>
     </section>
@@ -734,7 +749,7 @@
     <button data-view="compare" type="button"><span class="ic">⇄</span>Compare</button>
     <button data-view="search" type="button"><span class="ic">🔍</span>Search</button>
     <button data-view="study" type="button"><span class="ic">👥</span>Study</button>
-    <button data-view="library" type="button"><span class="ic">📥</span>Library</button>
+    <button data-view="journal" type="button"><span class="ic">🕯️</span>Journal</button>
   </div>
 
 </div>
@@ -823,6 +838,19 @@
     <div id="strongsEntryBody" style="font-size:14.5px;line-height:1.6;margin-bottom:14px"></div>
     <div class="sheet-actions">
       <button class="ghost" id="strongsEntryClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Concordance: every verse using a Strong's word -->
+<div id="wordSheetBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref" id="wordSheetTitle"></div>
+    <div class="sheet-text" id="wordSheetStatus"></div>
+    <div id="wordSheetList"></div>
+    <div class="sheet-actions">
+      <button class="primary" id="wordSaveTab">Save first 12 as a tab</button>
+      <button class="ghost" id="wordSheetClose">Close</button>
     </div>
   </div>
 </div>
@@ -1035,7 +1063,7 @@
      IndexedDB layer
   ===================================================================== */
   const DB_NAME = "berea";
-  const DB_VERSION = 5;
+  const DB_VERSION = 6;
   let _dbPromise = null;
 
   function openDB() {
@@ -1068,6 +1096,10 @@
         if (!db.objectStoreNames.contains("topics")) {
           // Nave's Topical: one record per topic heading.
           db.createObjectStore("topics", { keyPath: "key" });
+        }
+        if (!db.objectStoreNames.contains("concordance")) {
+          // Inverted index: Strong's number -> every verse using that word.
+          db.createObjectStore("concordance", { keyPath: "key" });
         }
         if (!db.objectStoreNames.contains("tagged")) {
           // Strong's-tagged verse tokens, keyed book|chapter|verse.
@@ -1551,6 +1583,93 @@
     return await idbReq(tx.objectStore("tagged").get(`${bookName}|${chapter}|${verse}`));
   }
 
+  /* ---------------------------------------------------------------------
+     Concordance index
+     Built from the tagged text already in the database: for each Strong's
+     number, the list of verses that use it. This is what makes the classic
+     concordance question answerable — "show me every place this exact
+     Hebrew word appears" — which is the real reason to want Strong's, since
+     seeing one word rendered six different ways teaches more than any single
+     definition does.
+
+     Built with a cursor rather than getAll() so a 31,000-verse scan doesn't
+     hold the whole tagged text in memory at once, and written back in
+     batches. Anyone who downloaded tagged text before this existed can
+     build the index without re-downloading.
+  --------------------------------------------------------------------- */
+  async function buildConcordanceIndex(onProgress) {
+    const db = await openDB();
+    const total = await idbReq(db.transaction("tagged", "readonly").objectStore("tagged").count());
+    if (!total) throw new Error("No tagged text stored yet — download a Strong's-tagged Bible first");
+
+    const index = new Map();
+    let seen = 0;
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction("tagged", "readonly");
+      const cursorReq = tx.objectStore("tagged").openCursor();
+      cursorReq.onsuccess = () => {
+        const cur = cursorReq.result;
+        if (!cur) { resolve(); return; }
+        const rec = cur.value;
+        const parts = String(rec.ref).split("|");
+        if (parts.length === 3 && Array.isArray(rec.tokens)) {
+          const entry = { book: parts[0], chapter: parseInt(parts[1], 10), verse: parseInt(parts[2], 10) };
+          for (const tok of rec.tokens) {
+            if (!tok.strongs) continue;
+            for (const num of tok.strongs) {
+              if (!index.has(num)) index.set(num, []);
+              const list = index.get(num);
+              // One entry per verse per number, even if the word repeats.
+              const last = list[list.length - 1];
+              if (!last || last.book !== entry.book || last.chapter !== entry.chapter || last.verse !== entry.verse) {
+                list.push(entry);
+              }
+            }
+          }
+        }
+        seen++;
+        // Scanning is the first half of the work, writing the second.
+        if (seen % 2000 === 0) onProgress(seen, total * 2);
+        cur.continue();
+      };
+      cursorReq.onerror = () => reject(cursorReq.error);
+    });
+
+    if (!index.size) throw new Error("The stored text has no Strong's tags to index");
+
+    const keys = Array.from(index.keys());
+    const BATCH = 500;
+    for (let i = 0; i < keys.length; i += BATCH) {
+      const chunk = keys.slice(i, i + BATCH);
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("concordance", "readwrite");
+        const store = tx.objectStore("concordance");
+        for (const k of chunk) {
+          const refs = index.get(k);
+          // Keep verse order canonical so results read like a concordance.
+          refs.sort((a, b) => {
+            const ai = BOOKS.findIndex((x) => x.name === a.book);
+            const bi = BOOKS.findIndex((x) => x.name === b.book);
+            return ai - bi || a.chapter - b.chapter || a.verse - b.verse;
+          });
+          store.put({ key: k, count: refs.length, refs });
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+      onProgress(total + Math.round((i / keys.length) * total), total * 2);
+    }
+    onProgress(total * 2, total * 2);
+    await setMeta("concordance", { built: true, words: keys.length, builtAt: Date.now() });
+    return { words: keys.length };
+  }
+
+  async function getConcordanceEntry(number) {
+    const db = await openDB();
+    const tx = db.transaction("concordance", "readonly");
+    return await idbReq(tx.objectStore("concordance").get(String(number).toUpperCase()));
+  }
+
   async function getTaggedChapter(bookName, chapter) {
     const db = await openDB();
     const tx = db.transaction("tagged", "readonly");
@@ -1848,12 +1967,14 @@
     $$(".view").forEach((v) => v.classList.remove("active"));
     $("#view-" + name).classList.add("active");
     $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+    $("#menuBtn").classList.toggle("on", name === "library");
     $("#content").scrollTop = 0;
     if (name === "read") renderRead();
     if (name === "compare") renderCompare();
     if (name === "search") renderSearchTr();
-    if (name === "library") { renderHelpList(); renderLibrary(); renderAiPanel(); renderStrongsCards(); renderTaggedCards(); renderXrefCards(); renderNavesCards(); renderBackupPanel(); renderApologeticsList(); }
+    if (name === "library") { renderHelpList(); renderLibrary(); renderAiPanel(); renderStrongsCards(); renderTaggedCards(); renderConcordanceCard(); renderXrefCards(); renderNavesCards(); renderBackupPanel(); renderApologeticsList(); }
     if (name === "study") renderStudyView();
+    if (name === "journal") renderJournalView();
   }
 
   function refLabel(book, chapter, verseStart, verseEnd) {
@@ -2079,7 +2200,7 @@
     const rows = await buildSearchIndex(trId);
     if (!rows.length) {
       results.innerHTML = `<div class="hint">No ${trId} text cached yet to search. Read a few chapters or download it in <button class="link" id="goLibrary">Library</button> first.</div>`;
-      $("#goLibrary")?.addEventListener("click", () => { setView("library"); $$("#bottomnav button").forEach(b=>b.classList.toggle("active", b.dataset.view==="library")); });
+      $("#goLibrary")?.addEventListener("click", () => setView("library"));
       return;
     }
     const q = query.trim().toLowerCase();
@@ -2129,9 +2250,11 @@
     $("#searchForm").style.display = mode === "verses" ? "flex" : "none";
     $("#tabSearchForm").style.display = mode === "tabs" ? "flex" : "none";
     $("#topicSearchForm").style.display = mode === "topics" ? "flex" : "none";
+    $("#wordSearchForm").style.display = mode === "words" ? "flex" : "none";
     $("#searchResults").innerHTML = "";
     if (mode === "tabs") runTabSearch($("#tabSearchInput").value);
     if (mode === "topics") runTopicSearch($("#topicSearchInput").value);
+    if (mode === "words") runWordSearch($("#wordSearchInput").value);
   }
 
   let lastTopicResults = [];
@@ -2158,6 +2281,94 @@
     results.querySelectorAll(".result").forEach((el) => {
       el.addEventListener("click", () => openTopicSheet(lastTopicResults[parseInt(el.dataset.i, 10)]));
     });
+  }
+
+  /* ---- Words (concordance) search ---- */
+  let lastWordResults = [];
+
+  async function runWordSearch(query) {
+    const results = $("#searchResults");
+    const q = (query || "").trim();
+    const meta = await getMeta("concordance");
+    if (!meta || !meta.built) {
+      results.innerHTML = `<div class="hint">The word index isn't built yet. Download a Strong's-tagged Bible under <strong>Library \u203a Hebrew &amp; Greek</strong>, then build the index there — after that you can see every verse that uses a given Hebrew or Greek word.</div>`;
+      return;
+    }
+    if (!q) {
+      results.innerHTML = `<div class="hint">Type an English word (<em>mercy</em>), a transliteration (<em>agape</em>), or a Strong's number (<em>H2617</em>). You'll get every verse that uses that original-language word — which is where the payoff is: one Hebrew word often gets translated several different ways.</div>`;
+      return;
+    }
+    results.innerHTML = `<div class="page-loading">Searching\u2026</div>`;
+
+    // A direct number goes straight through; anything else resolves via the
+    // Strong's dictionary first, so "mercy" finds the words behind it.
+    let candidates = [];
+    if (/^[HG]\s*0*\d+$/i.test(q)) {
+      candidates = [{ key: q.toUpperCase().replace(/\s+/g, ""), lemma: "", xlit: "" }];
+    } else {
+      const dictHits = await searchStrongsDict(q);
+      if (!dictHits.length) {
+        results.innerHTML = `<div class="hint">No original-language word matched \u201c${escapeHtml(q)}.\u201d Try another wording, or a Strong's number directly. (Word lookup needs the Strong's dictionaries downloaded too.)</div>`;
+        return;
+      }
+      candidates = dictHits.slice(0, 12);
+    }
+
+    const found = [];
+    for (const c of candidates) {
+      const entry = await getConcordanceEntry(c.key);
+      if (entry && entry.count) found.push({ ...c, count: entry.count, refs: entry.refs });
+    }
+    if (!found.length) {
+      results.innerHTML = `<div class="hint">Found the word in the dictionary, but no occurrences in the tagged text you've downloaded. The tagged Bible may cover a different testament than this word.</div>`;
+      return;
+    }
+    found.sort((a, b) => b.count - a.count);
+    lastWordResults = found;
+    results.innerHTML = found.map((f, i) => `
+      <div class="result" data-i="${i}">
+        <div class="result-ref">${escapeHtml(f.key)}${f.xlit ? " \u00b7 " + escapeHtml(f.xlit) : ""} \u00b7 ${f.count} occurrence${f.count === 1 ? "" : "s"}</div>
+        <div class="result-text"><strong>${escapeHtml(f.lemma || f.key)}</strong>${f.kjvDef ? ` \u2014 ${escapeHtml(f.kjvDef.slice(0, 80))}` : ""}</div>
+      </div>`).join("");
+    results.querySelectorAll(".result").forEach((el) => {
+      el.addEventListener("click", () => openConcordanceSheet(lastWordResults[parseInt(el.dataset.i, 10)]));
+    });
+  }
+
+  let currentConcordance = null;
+  const CONCORDANCE_PAGE = 60;
+
+  async function openConcordanceSheet(hit) {
+    if (!hit) return;
+    currentConcordance = hit;
+    $("#wordSheetTitle").textContent = (hit.lemma || hit.key) + (hit.xlit ? " \u00b7 " + hit.xlit : "");
+    $("#wordSheetStatus").textContent = `${hit.key} \u2014 ${hit.count} occurrence${hit.count === 1 ? "" : "s"}. Tap a verse to read it in context.`;
+    $("#wordSheetBackdrop").classList.add("show");
+    renderConcordanceList(CONCORDANCE_PAGE);
+  }
+
+  // Renders a capped slice with a "show more" control — a common word can
+  // appear thousands of times and rendering all of it would lock the page.
+  function renderConcordanceList(limit) {
+    const hit = currentConcordance;
+    if (!hit) return;
+    const shown = hit.refs.slice(0, limit);
+    $("#wordSheetList").innerHTML =
+      shown.map((r, i) => `<button class="topic-ref" data-i="${i}">${escapeHtml(r.book)} ${r.chapter}:${r.verse}</button>`).join("") +
+      (hit.refs.length > limit
+        ? `<div style="margin-top:10px"><button class="dl" id="wordShowMore" style="width:100%">Show more (${hit.refs.length - limit} left)</button></div>`
+        : "");
+    $("#wordSheetList").querySelectorAll(".topic-ref").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const r = shown[parseInt(btn.dataset.i, 10)];
+        const book = bookByName(r.book);
+        if (!book) return;
+        state.book = book; state.chapter = r.chapter; state.verseFocus = r.verse;
+        $("#wordSheetBackdrop").classList.remove("show");
+        setView("read");
+      });
+    });
+    $("#wordShowMore")?.addEventListener("click", () => renderConcordanceList(limit + CONCORDANCE_PAGE * 2));
   }
 
   function openTopicSheet(topic) {
@@ -2652,6 +2863,49 @@
     });
   }
 
+  function renderJournalView() {
+    const wrap = $("#journalBody");
+    if (!wrap) return;
+    wrap.innerHTML = `
+      <div class="hint">This is where your own work will live — prayer requests and answered prayers, memory verses, reading-plan progress, and study outlines. Being built next; the concordance under <strong>Search › Words</strong> is ready now.</div>`;
+  }
+
+  async function renderConcordanceCard() {
+    const wrap = $("#concordanceCard");
+    if (!wrap) return;
+    const [meta, taggedKjv, taggedAsv] = await Promise.all([
+      getMeta("concordance"), getMeta("tagged-KJV"), getMeta("tagged-ASV"),
+    ]);
+    const haveTagged = (taggedKjv && taggedKjv.downloaded) || (taggedAsv && taggedAsv.downloaded);
+    wrap.innerHTML = `
+      <div class="trcard">
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">Word index (concordance)</div>
+            <div class="trcard-status">${meta && meta.built
+              ? `${meta.words.toLocaleString()} words indexed — search them under Search › Words`
+              : haveTagged ? "Ready to build from your tagged text" : "Download a tagged Bible above first"}</div>
+          </div>
+          <button class="dl" id="concordanceBuildBtn" ${haveTagged ? "" : "disabled"}>${meta && meta.built ? "Rebuild" : "Build"}</button>
+        </div>
+        <div class="progress-track" id="prog-conc"><div class="progress-fill" id="progfill-conc"></div></div>
+      </div>`;
+    $("#concordanceBuildBtn").addEventListener("click", async () => {
+      const btn = $("#concordanceBuildBtn");
+      btn.disabled = true;
+      const track = $("#prog-conc"), fill = $("#progfill-conc");
+      track.classList.add("show");
+      try {
+        const r = await buildConcordanceIndex((d, t) => { fill.style.width = Math.round((d / t) * 100) + "%"; });
+        toast(`${r.words.toLocaleString()} words indexed`);
+      } catch (e) {
+        toast("Couldn't build the index: " + (e && e.message ? e.message : "unknown error"));
+      }
+      btn.disabled = false;
+      renderConcordanceCard();
+    });
+  }
+
   async function renderTaggedCards() {
     const wrap = $("#taggedCards");
     if (!wrap) return;
@@ -2985,6 +3239,7 @@
     { id: "h-start", title: "Getting started", body: `
       <p><strong>Berea</strong> is a study Bible that works offline and lets a group read together. The name is from Acts 17:11 — the Bereans "searched the scriptures daily, whether those things were so." That's the idea: check things for yourself.</p>
       <p>Nothing needs setting up to read. Tap the reference at the top to jump to any book and chapter, and use the dropdown beside it to switch translation.</p>
+      <p><strong>Getting around:</strong> the bottom bar holds the five places you'll use daily — Read, Compare, Search, Study and Journal. Downloads, this guide, apologetics and backups live here in <em>☰ Berea</em> at the top left.</p>
       <p><strong>First thing worth doing:</strong> under <em>Translations</em> below, download KJV or WEB. That makes the whole Bible available with no connection and switches on full-text search. Other translations load as you read and cache themselves.</p>
       <p><strong>Add it to your home screen</strong> (Share → Add to Home Screen on iPhone) and it opens like an app, full screen.</p>` },
 
@@ -3012,6 +3267,7 @@
         <li><strong>Verses</strong> — full-text search of whatever translations you've downloaded or read. Tap a result to jump there, or pin it straight to a tab.</li>
         <li><strong>Tabs</strong> — find a saved tab by name or by any reference inside it.</li>
         <li><strong>Topics</strong> — Nave's Topical Bible, once downloaded. Search by subject ("faith", "forgiveness") rather than by wording, then save a whole topic as a tab.</li>
+        <li><strong>Words</strong> — a concordance. Search an English word, transliteration, or Strong's number and get <em>every</em> verse using that original-language word. This is where Strong's earns its keep: seeing one Hebrew word rendered six different ways across the Old Testament tells you more than any single definition. Needs a tagged Bible plus the word index (both under ☰ Berea).</li>
       </ul>
       <p>Search only covers text stored on your device, so downloading a translation makes it far more useful.</p>` },
 
@@ -3626,6 +3882,25 @@
     runTabSearch($("#tabSearchInput").value);
   });
   $("#tabSearchInput").addEventListener("input", () => runTabSearch($("#tabSearchInput").value));
+  $("#wordSearchForm").addEventListener("submit", (ev) => { ev.preventDefault(); runWordSearch($("#wordSearchInput").value); });
+  $("#wordSheetClose").addEventListener("click", () => $("#wordSheetBackdrop").classList.remove("show"));
+  $("#wordSheetBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "wordSheetBackdrop") $("#wordSheetBackdrop").classList.remove("show"); });
+  $("#wordSaveTab").addEventListener("click", () => {
+    const hit = currentConcordance;
+    if (!hit) return;
+    const label = prompt("Label for this tab?", (hit.lemma || hit.key) + " \u2014 occurrences");
+    if (!label) return;
+    const refs = hit.refs.slice(0, 12).map((r) => ({ book: r.book, chapter: r.chapter, verseStart: r.verse, verseEnd: r.verse }));
+    const tabs = loadTabs();
+    const newTab = { id: "t_" + Date.now(), label, translationId: state.readTr, refs };
+    tabs.push(newTab);
+    saveTabs(tabs);
+    renderTabStrip();
+    broadcastTabAdd(newTab);
+    $("#wordSheetBackdrop").classList.remove("show");
+    toast("Tab created");
+  });
+  $("#menuBtn").addEventListener("click", () => setView("library"));
   $("#topicSearchForm").addEventListener("submit", (ev) => { ev.preventDefault(); runTopicSearch($("#topicSearchInput").value); });
   $("#topicSearchInput").addEventListener("input", () => runTopicSearch($("#topicSearchInput").value));
   $("#topicSheetClose").addEventListener("click", () => $("#topicSheetBackdrop").classList.remove("show"));
@@ -3673,7 +3948,6 @@
     $("#introGo").addEventListener("click", () => {
       close();
       setView("library");
-      $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "library"));
       setTimeout(() => {
         const first = $("#help-body-h-start");
         if (first) {
