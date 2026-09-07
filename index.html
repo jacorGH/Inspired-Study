@@ -232,6 +232,14 @@
     cursor: pointer;
   }
   .sword:active { background: var(--gilt-soft); }
+  .help-body {
+    font-size: 14.5px; line-height: 1.6; margin-top: 10px; color: var(--ink);
+  }
+  .help-body p { margin: 0 0 9px; }
+  .help-body p:last-child { margin-bottom: 0; }
+  .help-body ul { margin: 0 0 9px; padding-left: 20px; }
+  .help-body li { margin-bottom: 5px; }
+  .help-body em { color: var(--cover); font-style: normal; font-weight: 600; }
   .topic-ref {
     display: inline-block; font-family: var(--font-ui); font-size: 12.5px;
     padding: 5px 10px; margin: 0 5px 5px 0; border-radius: 999px;
@@ -655,6 +663,10 @@
     </section>
 
     <section id="view-library" class="view">
+      <div class="testament-label" style="margin-top:0">How to use Berea</div>
+      <div id="helpList"></div>
+
+      <div class="testament-label" style="margin-top:22px">Translations</div>
       <div class="hint"><strong>Public-domain translations</strong> download once for full offline reading and search. Licensed translations (NIV, NKJV) aren't included — see the note in the page source for why. YLT covers the New Testament only.</div>
       <div id="trcards"></div>
 
@@ -1737,7 +1749,7 @@
     if (name === "read") renderRead();
     if (name === "compare") renderCompare();
     if (name === "search") renderSearchTr();
-    if (name === "library") { renderLibrary(); renderAiPanel(); renderStrongsCards(); renderTaggedCards(); renderXrefCards(); renderNavesCards(); renderBackupPanel(); renderApologeticsList(); }
+    if (name === "library") { renderHelpList(); renderLibrary(); renderAiPanel(); renderStrongsCards(); renderTaggedCards(); renderXrefCards(); renderNavesCards(); renderBackupPanel(); renderApologeticsList(); }
     if (name === "study") renderStudyView();
   }
 
@@ -2863,6 +2875,98 @@
   }
 
   /* =====================================================================
+     In-app how-to
+     Mirrors README.md — if you change behaviour, update both.
+  ===================================================================== */
+  const HELP = [
+    { id: "h-start", title: "Getting started", body: `
+      <p><strong>Berea</strong> is a study Bible that works offline and lets a group read together. The name is from Acts 17:11 — the Bereans "searched the scriptures daily, whether those things were so." That's the idea: check things for yourself.</p>
+      <p>Nothing needs setting up to read. Tap the reference at the top to jump to any book and chapter, and use the dropdown beside it to switch translation.</p>
+      <p><strong>First thing worth doing:</strong> under <em>Translations</em> below, download KJV or WEB. That makes the whole Bible available with no connection and switches on full-text search. Other translations load as you read and cache themselves.</p>
+      <p><strong>Add it to your home screen</strong> (Share → Add to Home Screen on iPhone) and it opens like an app, full screen.</p>` },
+
+    { id: "h-read", title: "Reading and marking up", body: `
+      <p><strong>Tap any verse</strong> to open its menu. From there you can:</p>
+      <ul>
+        <li><strong>Highlight</strong> in five colours — highlights follow the verse, so marking John 3:16 marks it in every translation.</li>
+        <li><strong>Write a note.</strong> Notes save whichever way you close the menu, so nothing gets lost. A small ✎ appears on any verse that has one.</li>
+        <li><strong>Pin it as a tab</strong>, or add it to an existing tab.</li>
+        <li><strong>Look up cross-references</strong>, either the traditional set or an AI prompt.</li>
+      </ul>` },
+
+    { id: "h-compare", title: "Compare — two translations side by side", body: `
+      <p>The <strong>Compare</strong> tab shows the same chapter in two translations as facing pages, like an open book. Pick a translation per page from the dropdowns.</p>
+      <p>Highlights and notes show up on both sides, since they're attached to the verse rather than the translation.</p>` },
+
+    { id: "h-tabs", title: "Tabs — the heart of it", body: `
+      <p>A <strong>tab</strong> holds a set of passages and shows them side by side. That's what makes connections visible: put Matthew 27:46 next to Psalm 22:1 and you can see Jesus quoting the psalm from the cross. Two tabs come pre-made as examples.</p>
+      <p>Tabs live in the strip above the bottom bar. Tap one to open it, <strong>+ tab</strong> to make one from the current chapter, or × to remove it.</p>
+      <p>Inside an open tab, <strong>+ Add a cross-reference passage</strong> takes a reference in plain form — "Romans 8:38-39", "ps 22", "1 cor 13:4-7" all work.</p>` },
+
+    { id: "h-search", title: "Search — verses, tabs, and topics", body: `
+      <p>Three modes, chosen with the toggle at the top:</p>
+      <ul>
+        <li><strong>Verses</strong> — full-text search of whatever translations you've downloaded or read. Tap a result to jump there, or pin it straight to a tab.</li>
+        <li><strong>Tabs</strong> — find a saved tab by name or by any reference inside it.</li>
+        <li><strong>Topics</strong> — Nave's Topical Bible, once downloaded. Search by subject ("faith", "forgiveness") rather than by wording, then save a whole topic as a tab.</li>
+      </ul>
+      <p>Search only covers text stored on your device, so downloading a translation makes it far more useful.</p>` },
+
+    { id: "h-study", title: "Study sessions — reading together", body: `
+      <p>The <strong>Study</strong> tab starts a shared session. Tap <em>Start a Study</em>, then send the link over any messaging app — whoever opens it joins straight away, no code to type.</p>
+      <p><strong>Leading:</strong> whoever leads moves the group through the passage. Anyone can tap <em>Take the lead</em>, and anyone can switch off <em>Follow along</em> to wander on their own.</p>
+      <p><strong>Sharing marks</strong> is off by default. Switch it on and your highlights and notes go to everyone else who also has it on, and theirs come to you. Leave it off to mark up privately. If you turn it on mid-study, <em>Send my existing marks</em> catches the group up on the current chapter.</p>
+      <p>Everyone connects directly to everyone else, so the session keeps going even if the person who started it closes their tab. Reopening the same link rejoins.</p>` },
+
+    { id: "h-original", title: "Hebrew and Greek", body: `
+      <p>Two separate things, both under <em>Hebrew &amp; Greek</em> below:</p>
+      <ul>
+        <li><strong>Strong's dictionaries</strong> — download Hebrew and Greek, then search by English word, transliteration, or number ("agape", "H7225").</li>
+        <li><strong>Tap-a-word text</strong> — download a tagged KJV or ASV, then use the <strong>Strong's</strong> button at the top of the Read view. Tagged words get a dotted underline; tap one for the lexeme, transliteration, pronunciation, and definition.</li>
+      </ul>
+      <p>Lookups work offline once the dictionaries are downloaded, and fall back to an online lexicon otherwise.</p>` },
+
+    { id: "h-xref", title: "Cross-references — traditional and AI", body: `
+      <p><strong>Treasury of Scripture Knowledge</strong> is the classic set scholars have used for over a century — several hundred thousand verse-to-verse links, ranked by how many editors flagged each one. Download it below, then reach it from any verse's menu.</p>
+      <p><strong>AI-assisted</strong> works differently: Berea writes the prompt, you paste it into whatever AI you already use, then paste the reply back to import the suggestions. No account or API key needed. It asks for quotations, fulfilments, thematic parallels, and undesigned coincidences, and you choose which ones become a tab.</p>
+      <p>Treat AI suggestions as leads to check, not answers — verify each reference before you build on it.</p>` },
+
+    { id: "h-apologetics", title: "Apologetics practice", body: `
+      <p>Six common objections — suffering, alleged contradictions, Gospel reliability, Old Testament violence, hell and exclusivity, science — each with the objection stated fairly, a response outline, and the passages behind it.</p>
+      <p>Save any of them as a tab to have the verses side by side while you think it through.</p>` },
+
+    { id: "h-backup", title: "Backing up your work", body: `
+      <p>Your tabs, highlights, and notes live <strong>only in this browser</strong>. Clearing site data or switching devices loses them, so save a backup file from <em>Backup &amp; restore</em> below now and then.</p>
+      <p>Restoring <strong>merges</strong> rather than replaces — it won't wipe work already on the device. Where both have something for the same verse, the file being restored wins.</p>
+      <p>Backups deliberately leave out downloaded scripture, dictionaries, and cross-references, since those are large and easy to download again.</p>` },
+
+    { id: "h-privacy", title: "Where your data lives", body: `
+      <p>Everything you create stays on your device. There's no account and no server storing your work.</p>
+      <p>Study sessions connect devices directly to each other; a public signalling service helps browsers find each other, then session traffic goes peer-to-peer.</p>
+      <p>Downloads come from public repositories of public-domain texts. If you connect an AI API key, it's stored only in this browser and sent only to that provider.</p>` },
+  ];
+
+  function renderHelpList() {
+    const wrap = $("#helpList");
+    if (!wrap) return;
+    wrap.innerHTML = HELP.map((h) => `
+      <div class="trcard">
+        <div class="trcard-name" style="cursor:pointer;display:flex;justify-content:space-between;gap:10px" data-help="${h.id}">
+          <span>${escapeHtml(h.title)}</span><span style="color:var(--gilt-soft);font-weight:400">+</span>
+        </div>
+        <div id="help-body-${h.id}" class="help-body" style="display:none">${h.body}</div>
+      </div>`).join("");
+    wrap.querySelectorAll("[data-help]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const body = $("#help-body-" + el.dataset.help);
+        const open = body.style.display !== "none";
+        body.style.display = open ? "none" : "block";
+        el.lastElementChild.textContent = open ? "+" : "\u2013";
+      });
+    });
+  }
+
+  /* =====================================================================
      Apologetics practice content
      Static, authored content — objections stated fairly, a response
      outline, and the passages that back it up (tap "Save as a tab" to
@@ -3449,12 +3553,44 @@
   /* =====================================================================
      Boot
   ===================================================================== */
+  // One-time pointer to the how-to, so a first-time reader can find it
+  // without the app nagging returning users.
+  function maybeShowFirstRunHint() {
+    if (localStorage.getItem("berea.seenIntro")) return;
+    const banner = document.createElement("div");
+    banner.className = "hint";
+    banner.style.marginBottom = "14px";
+    banner.innerHTML = `<strong>New here?</strong> There's a short guide under Library \u203a How to use Berea \u2014 or just start reading. <button class="link" id="introGo">Show me the guide</button> \u00b7 <button class="link" id="introDismiss">Dismiss</button>`;
+    const body = $("#readBody");
+    body.parentNode.insertBefore(banner, body);
+    const close = () => {
+      localStorage.setItem("berea.seenIntro", "1");
+      banner.remove();
+    };
+    $("#introGo").addEventListener("click", () => {
+      close();
+      setView("library");
+      $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "library"));
+      setTimeout(() => {
+        const first = $("#help-body-h-start");
+        if (first) {
+          first.style.display = "block";
+          const head = document.querySelector('[data-help="h-start"]');
+          if (head) head.lastElementChild.textContent = "\u2013";
+          first.scrollIntoView({ block: "center" });
+        }
+      }, 120);
+    });
+    $("#introDismiss").addEventListener("click", close);
+  }
+
   async function boot() {
     try { await openDB(); }
     catch (e) { toast("This browser doesn't support offline storage — reading will still work online."); }
     seedDefaultTabsIfEmpty();
     renderTabStrip();
     setView("read");
+    maybeShowFirstRunHint();
     const m = location.hash.match(/study=([A-Za-z0-9]+)/);
     if (m) {
       setView("study");
