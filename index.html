@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5C1A24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Berea — Study Bible</title>
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!--
+  BEREA — a single-file, mobile-first study Bible reader.
+
+  Architecture notes (read this before extending):
+  - No build step, no dependencies. Everything lives in this one HTML file
+    so it can be hosted directly from GitHub Pages.
+  - Scripture text is NOT bundled in this file (that would make it huge and
+    hard to update). Instead:
+      · KJV and WEB are fetched book-by-book from aruljohn's public-domain
+        JSON repos (raw.githubusercontent.com) via the "Download" action in
+        the Library view, and cached in IndexedDB for full offline reading.
+      · ASV (and any translation before it's been downloaded) is fetched
+        live, one chapter at a time, from bible-api.com's public JSON API
+        and progressively cached to IndexedDB as you read. bible-api.com
+        explicitly asks that it NOT be used for bulk/whole-Bible downloads
+        (rate-limited, hobby server) — that's why only KJV/WEB get a bulk
+        "Download" button. See getChapterVerses().
+      · NIV/NKJV are NOT included: both are still under active copyright
+        (Biblica / Thomas Nelson) and can't be legally bundled or bulk
+        fetched. Adding them later means wiring a licensed API (e.g.
+        api.bible) with a user-supplied key — a good phase-2 addition.
+  - Study sessions (PeerJS mesh, added in this pass):
+      · One well-known "rendezvous" peer id per room (berea-{code}-host).
+        Whoever holds it is how new people find the room, but everyone
+        connects directly to everyone else too (true mesh, not hub-and-
+        spoke) — so if the person who started the study closes their tab,
+        the rest of the group is still directly connected to each other
+        and keeps going. If a NEW person needs to join after that, the
+        lowest-id survivor reclaims the rendezvous id automatically so
+        the room stays findable. Reopening the same link (with the room
+        code in the URL hash) is how anyone rejoins.
+      · "Leader" (whose navigation the group follows) is a separate,
+        lightweight role anyone can claim with a tap — decoupled from the
+        rendezvous/connectivity role above on purpose.
+      · Uses PeerJS's free public signaling broker only to help browsers
+        find each other; once connected, everything (text, presence,
+        pinned tabs) flows peer-to-peer, nothing touches a server we run.
+      · Known rough edge: reclaiming the rendezvous id after a disconnect
+        rebuilds that one peer's mesh connections from scratch, which
+        causes a brief (sub-few-second) reconnect blip for the group.
+  - Known next phase (intentionally NOT in this build):
+      · Strong's concordance + Hebrew/Greek lexicon lookups.
+  - Data model:
+      · verses store: one record per {translation, book, chapter, verse}.
+      · highlights: keyed by book|chapter|verse (translation-agnostic —
+        highlighting John 3:16 highlights it in every translation).
+      · tabs (localStorage): a tab is a saved *set* of references, so a
+        tab can hold a single pinned verse OR a cross-reference pairing
+        like Matthew 27:46 + Psalm 22:1, rendered side by side.
+-->
+
+<style>
+  :root {
+    --page: #FAF6EC;
+    --page-dim: #F1EBDA;
+    --panel: #FFFFFF;
+    --ink: #2B2620;
+    --ink-soft: #6B6357;
+    --ink-faint: #9A917F;
+    --cover: #5C1A24;
+    --cover-light: #7A2733;
+    --cover-text: #F3E7D9;
+    --gilt: #A9812E;
+    --gilt-soft: #D9C68A;
+    --line: #E4DBC5;
+    --spine-a: rgba(43, 38, 32, 0.16);
+    --spine-b: rgba(43, 38, 32, 0.02);
+    --hl-yellow: rgba(247, 205, 74, 0.55);
+    --hl-green: rgba(123, 176, 108, 0.42);
+    --hl-blue: rgba(103, 150, 190, 0.38);
+    --hl-pink: rgba(214, 121, 140, 0.4);
+    --font-display: 'Fraunces', Georgia, 'Iowan Old Style', serif;
+    --font-serif: 'Source Serif 4', Georgia, serif;
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--font-serif);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { overscroll-behavior-y: contain; }
+  button { font-family: var(--font-ui); }
+  ::selection { background: var(--hl-yellow); }
+
+  #app {
+    max-width: 640px;
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--page);
+    box-shadow: 0 0 40px rgba(0,0,0,0.06);
+  }
+
+  /* ---------- Top bar ---------- */
+  #topbar {
+    flex: 0 0 auto;
+    padding-top: calc(var(--safe-top) + 10px);
+    background: var(--cover);
+    color: var(--cover-text);
+    border-bottom: 1px solid var(--gilt);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-bottom: 10px;
+  }
+  #wordmark {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: 0.2px;
+    color: var(--gilt-soft);
+    flex: 0 0 auto;
+  }
+  #refBtn {
+    flex: 1 1 auto;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    color: var(--cover-text);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    text-align: left;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #trBadge {
+    flex: 0 0 auto;
+    background: var(--cover-light);
+    border: 1px solid var(--gilt);
+    color: var(--cover-text);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    letter-spacing: 0.3px;
+    max-width: 92px;
+  }
+
+  /* ---------- Main content ---------- */
+  #content {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 18px 28px;
+  }
+  .view { display: none; }
+  .view.active { display: block; animation: fadeIn 0.18s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .hint {
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    background: var(--page-dim);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+  .hint strong { color: var(--ink); }
+  .hint button.link {
+    background: none; border: none; padding: 0; color: var(--cover);
+    font-weight: 600; text-decoration: underline; cursor: pointer; font-size: inherit;
+    font-family: var(--font-ui);
+  }
+
+  /* ---------- Read view ---------- */
+  #readChapterTitle, .chapter-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 12px;
+  }
+  .verseflow { font-size: 17px; line-height: 1.72; }
+  .verse {
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 1px 0;
+    transition: background 0.15s ease;
+  }
+  .verse.flash { background: var(--hl-yellow) !important; }
+  .vnum {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gilt);
+    vertical-align: super;
+    margin-right: 2px;
+  }
+  .hl-yellow { background: var(--hl-yellow); }
+  .hl-green  { background: var(--hl-green); }
+  .hl-blue   { background: var(--hl-blue); }
+  .hl-pink   { background: var(--hl-pink); }
+
+  /* ---------- Two-page spread (compare + tab view) ---------- */
+  .spread {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--panel);
+    margin-bottom: 14px;
+  }
+  .page {
+    flex: 1 1 260px;
+    min-width: 0;
+    padding: 16px 15px;
+    position: relative;
+  }
+  .page + .page {
+    border-left: 1px solid var(--line);
+    box-shadow: inset 6px 0 10px -8px var(--spine-a);
+  }
+  .page:first-child { box-shadow: inset -6px 0 10px -8px var(--spine-a); }
+  .page-head {
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  .page-head select {
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--cover);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--page);
+    padding: 2px 4px;
+  }
+  .page .verseflow { font-size: 15.5px; line-height: 1.62; }
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
+  .page-loading { color: var(--ink-faint); font-family: var(--font-ui); font-size: 13px; }
+
+  /* ---------- Search ---------- */
+  #searchForm { display: flex; gap: 8px; margin-bottom: 14px; }
+  .seg-toggle {
+    display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 12px;
+  }
+  .seg-toggle button {
+    flex: 1; background: var(--panel); border: none; padding: 9px; font-family: var(--font-ui);
+    font-size: 13px; font-weight: 600; color: var(--ink-soft);
+  }
+  .seg-toggle button.active { background: var(--cover); color: var(--cover-text); }
+  .seg-toggle button + button { border-left: 1px solid var(--line); }
+  #searchInput {
+    flex: 1 1 auto;
+    font-family: var(--font-ui);
+    font-size: 15px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  #searchTr {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 0 6px;
+  }
+  #searchGo {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 14px;
+    background: var(--cover);
+    color: var(--cover-text);
+    border: none;
+    border-radius: 9px;
+    padding: 0 16px;
+  }
+  .result {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .result:last-child { border-bottom: none; }
+  .result-ref {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cover);
+    margin-bottom: 3px;
+  }
+  .result-text { font-size: 15px; line-height: 1.5; }
+  .result-text mark { background: var(--hl-yellow); border-radius: 2px; }
+  .result-actions { margin-top: 5px; }
+  .result-actions button {
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    background: var(--page-dim);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+
+  /* ---------- Library ---------- */
+  .trcard {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 15px;
+    margin-bottom: 12px;
+    background: var(--panel);
+  }
+  .trcard-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .trcard-name { font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+  .trcard-status { font-family: var(--font-ui); font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+  .trcard button.dl {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 13px;
+    background: var(--cover);
+    color: var(--cover-text);
+    border: none;
+    border-radius: 8px;
+    padding: 7px 13px;
+    flex: 0 0 auto;
+  }
+  .trcard button.dl:disabled { opacity: 0.5; }
+  .progress-track {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--page-dim);
+    margin-top: 10px;
+    overflow: hidden;
+    display: none;
+  }
+  .progress-track.show { display: block; }
+  .progress-fill { height: 100%; background: var(--gilt); width: 0%; transition: width 0.2s ease; }
+
+  /* ---------- Tabs strip ---------- */
+  #tabstrip {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+    padding: 7px 10px;
+    overflow-x: auto;
+    background: var(--page-dim);
+    border-top: 1px solid var(--line);
+    -webkit-overflow-scrolling: touch;
+  }
+  #tabstrip::-webkit-scrollbar { display: none; }
+  .tabpill {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--panel);
+    border: 1px solid var(--gilt-soft);
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 6px 6px 6px 12px;
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .tabpill .x {
+    color: var(--ink-faint);
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 5px;
+  }
+  .tabpill.add { color: var(--cover); border-style: dashed; font-weight: 600; padding: 6px 12px; }
+
+  /* ---------- Bottom nav ---------- */
+  #bottomnav {
+    flex: 0 0 auto;
+    display: flex;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+    padding-bottom: var(--safe-bottom);
+  }
+  #bottomnav button {
+    flex: 1 1 0;
+    background: none;
+    border: none;
+    padding: 9px 4px 8px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  #bottomnav button .ic { font-size: 18px; }
+  #bottomnav button.active { color: var(--cover); }
+
+  /* ---------- Book/chapter picker modal ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(43,38,32,0.45);
+    display: none; align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal-sheet {
+    background: var(--page);
+    width: 100%; max-width: 640px;
+    max-height: 82vh;
+    border-radius: 16px 16px 0 0;
+    display: flex; flex-direction: column;
+    padding-bottom: var(--safe-bottom);
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .modal-title { font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+  .modal-close {
+    background: none; border: none; font-size: 22px; color: var(--ink-soft); padding: 2px 6px;
+  }
+  .modal-body { overflow-y: auto; padding: 10px 16px 20px; -webkit-overflow-scrolling: touch; }
+  .testament-label {
+    font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    color: var(--gilt); margin: 14px 0 8px;
+  }
+  .book-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+  }
+  .book-btn {
+    text-align: left;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 10px; font-family: var(--font-serif); font-size: 14.5px; color: var(--ink);
+  }
+  .chapter-grid {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  }
+  .chapter-btn {
+    aspect-ratio: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    font-family: var(--font-ui); font-weight: 600; font-size: 14px; color: var(--ink);
+  }
+  .chapter-btn:active, .book-btn:active { background: var(--gilt-soft); }
+  .back-row { margin-bottom: 6px; }
+  .back-row button {
+    font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--cover);
+    background: none; border: none; padding: 4px 0;
+  }
+
+  /* ---------- Verse action sheet ---------- */
+  .sheet-backdrop {
+    position: fixed; inset: 0; background: rgba(43,38,32,0.45);
+    display: none; align-items: flex-end; justify-content: center; z-index: 60;
+  }
+  .sheet-backdrop.show { display: flex; }
+  .sheet {
+    background: var(--page); width: 100%; max-width: 640px;
+    border-radius: 16px 16px 0 0; padding: 16px 18px calc(18px + var(--safe-bottom));
+  }
+  .sheet-ref { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .sheet-text { font-size: 14.5px; color: var(--ink-soft); margin-bottom: 14px; line-height: 1.5; }
+  .swatches { display: flex; gap: 10px; margin-bottom: 14px; }
+  .swatch {
+    width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line);
+  }
+  .swatch.none { background: var(--panel); position: relative; }
+  .swatch.none::after {
+    content: ''; position: absolute; left: 6px; right: 6px; top: 16px; height: 2px;
+    background: var(--ink-faint); transform: rotate(-40deg);
+  }
+  .sheet-actions { display: flex; flex-direction: column; gap: 8px; }
+  .sheet-actions button, .sheet-actions select, .sheet-actions input {
+    font-family: var(--font-ui); font-size: 14.5px; font-weight: 600;
+    padding: 11px 14px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); text-align: left;
+  }
+  .sheet-actions input { font-weight: 400; width: 100%; }
+  .sheet-actions button.primary { background: var(--cover); color: var(--cover-text); border: none; }
+  .sheet-actions button.ghost { background: none; border: none; color: var(--ink-soft); }
+  .sheet.wide-sheet { max-height: 78vh; overflow-y: auto; }
+  .ai-suggestion {
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .ai-suggestion input[type="checkbox"] { margin-top: 3px; flex: 0 0 auto; }
+  .ai-suggestion .ai-ref { font-family: var(--font-display); font-weight: 600; font-size: 14.5px; }
+  .ai-suggestion .ai-note { font-family: var(--font-ui); font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+  .ai-suggestion .ai-type {
+    font-family: var(--font-ui); font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+    color: var(--gilt); text-transform: uppercase;
+  }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 100px; transform: translate(-50%, 8px);
+    background: var(--ink); color: var(--page); font-family: var(--font-ui); font-size: 13px;
+    padding: 9px 16px; border-radius: 999px; opacity: 0; pointer-events: none;
+    transition: all 0.2s ease; z-index: 80; max-width: 80%; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- Study (mesh session) ---------- */
+  .roster-row {
+    padding: 9px 12px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel); display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-ui); font-size: 14px;
+  }
+  .roster-tag {
+    font-family: var(--font-ui); font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px; color: var(--gilt);
+  }
+  .code-input {
+    flex: 1; font-family: var(--font-ui); font-size: 15px; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 9px; text-transform: uppercase;
+    background: var(--panel); color: var(--ink);
+  }
+  .leave-btn {
+    width: 100%; font-family: var(--font-ui); font-weight: 600; padding: 11px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft);
+  }
+  .follow-row {
+    display: flex; align-items: center; gap: 8px; font-family: var(--font-ui);
+    font-size: 14px; margin-bottom: 16px;
+  }
+
+  @media (max-width: 380px) {
+    .page .verseflow { font-size: 14.5px; }
+    #wordmark { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .view.active { animation: none; }
+    .verse, .progress-fill { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div id="wordmark">Berea</div>
+    <button id="refBtn" type="button">Loading…</button>
+    <select id="trBadge"></select>
+  </div>
+
+  <div id="content">
+
+    <section id="view-read" class="view active">
+      <h1 id="readChapterTitle"></h1>
+      <div id="readBody" class="verseflow"></div>
+    </section>
+
+    <section id="view-compare" class="view">
+      <div class="hint">Pick two translations to read the same passage side by side, like an open book. Tap any verse to highlight it or pin it.</div>
+      <div id="compareSpread" class="spread"></div>
+    </section>
+
+    <section id="view-search" class="view">
+      <div class="seg-toggle" id="searchModeToggle">
+        <button data-mode="verses" class="active" type="button">Verses</button>
+        <button data-mode="tabs" type="button">Tabs</button>
+      </div>
+      <form id="searchForm">
+        <select id="searchTr"></select>
+        <input id="searchInput" type="text" placeholder="Search the text…" autocomplete="off">
+        <button id="searchGo" type="submit">Go</button>
+      </form>
+      <form id="tabSearchForm" style="display:none">
+        <input id="tabSearchInput" type="text" placeholder="Search your tabs by name or reference…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+      </form>
+      <div id="searchResults"></div>
+    </section>
+
+    <section id="view-tab" class="view">
+      <div id="tabViewHead"></div>
+      <div id="tabSpread" class="spread"></div>
+      <div id="tabAddRow"></div>
+    </section>
+
+    <section id="view-library" class="view">
+      <div class="hint"><strong>Public-domain translations</strong> download once for full offline reading and search. Licensed translations (NIV, NKJV) aren't included — see the note in the page source for why. YLT covers the New Testament only.</div>
+      <div id="trcards"></div>
+
+      <div class="testament-label" style="margin-top:22px">Cross-references (AI-assisted)</div>
+      <div class="hint">Ask an AI you configure with your own API key to suggest cross-references, thematic parallels, and undesigned coincidences for a passage — then turn what looks useful into a tab.</div>
+      <div id="aiPanel"></div>
+
+      <div class="testament-label" style="margin-top:22px">Apologetics practice</div>
+      <div class="hint">Common objections, framed fairly, with a response outline and the passages to back it up. Good for rehearsing before a real conversation.</div>
+      <div id="apologeticsList"></div>
+    </section>
+
+    <section id="view-study" class="view">
+      <div id="studyBody"></div>
+    </section>
+
+  </div>
+
+  <div id="tabstrip"></div>
+
+  <div id="bottomnav">
+    <button data-view="read" class="active" type="button"><span class="ic">📖</span>Read</button>
+    <button data-view="compare" type="button"><span class="ic">⇄</span>Compare</button>
+    <button data-view="search" type="button"><span class="ic">🔍</span>Search</button>
+    <button data-view="study" type="button"><span class="ic">👥</span>Study</button>
+    <button data-view="library" type="button"><span class="ic">📥</span>Library</button>
+  </div>
+
+</div>
+
+<!-- Book / chapter picker -->
+<div id="pickerBackdrop" class="modal-backdrop">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div class="modal-title" id="pickerTitle">Choose a book</div>
+      <button class="modal-close" id="pickerClose" type="button">×</button>
+    </div>
+    <div class="modal-body" id="pickerBody"></div>
+  </div>
+</div>
+
+<!-- Verse action sheet -->
+<div id="verseSheetBackdrop" class="sheet-backdrop">
+  <div class="sheet">
+    <div class="sheet-ref" id="vsRef"></div>
+    <div class="sheet-text" id="vsText"></div>
+    <div class="swatches" id="vsSwatches"></div>
+    <div class="sheet-actions" id="vsActions"></div>
+  </div>
+</div>
+
+<!-- AI provider settings -->
+<div id="aiConfigBackdrop" class="sheet-backdrop">
+  <div class="sheet">
+    <div class="sheet-ref">AI cross-reference settings</div>
+    <div class="sheet-text">Your key is stored only in this browser and sent straight to the provider — never through us. You're billed by them directly for whatever you use.</div>
+    <div class="sheet-actions">
+      <select id="aiProvider">
+        <option value="anthropic">Claude (Anthropic)</option>
+        <option value="openai">OpenAI</option>
+        <option value="custom">Custom (OpenAI-compatible API)</option>
+      </select>
+      <input id="aiKeyInput" type="password" placeholder="API key" autocomplete="off">
+      <input id="aiModelInput" type="text" placeholder="Model (optional — sensible default used otherwise)" autocomplete="off">
+      <input id="aiBaseUrlInput" type="text" placeholder="Base URL (custom provider only)" autocomplete="off" style="display:none">
+      <button class="primary" id="aiSaveConfig">Save</button>
+      <button class="ghost" id="aiCancelConfig">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI suggestion review -->
+<div id="aiSuggestBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref" id="aiSuggestRef"></div>
+    <div class="sheet-text" id="aiSuggestStatus">Asking…</div>
+    <div id="aiSuggestList"></div>
+    <div class="sheet-actions">
+      <button class="primary" id="aiCreateTab">Add selected as a tab</button>
+      <button class="ghost" id="aiSuggestClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- PeerJS: WebRTC signaling only (via peerjs.com's free public broker) —
+     actual study data goes directly peer-to-peer, never through a server. -->
+<script src="https://unpkg.com/peerjs@1/dist/peerjs.min.js"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =====================================================================
+     Canonical book data
+  ===================================================================== */
+  const BOOKS = [
+    { name: "Genesis", usfm: "GEN", file: "Genesis", chapters: 50, testament: "OT" },
+    { name: "Exodus", usfm: "EXO", file: "Exodus", chapters: 40, testament: "OT" },
+    { name: "Leviticus", usfm: "LEV", file: "Leviticus", chapters: 27, testament: "OT" },
+    { name: "Numbers", usfm: "NUM", file: "Numbers", chapters: 36, testament: "OT" },
+    { name: "Deuteronomy", usfm: "DEU", file: "Deuteronomy", chapters: 34, testament: "OT" },
+    { name: "Joshua", usfm: "JOS", file: "Joshua", chapters: 24, testament: "OT" },
+    { name: "Judges", usfm: "JDG", file: "Judges", chapters: 21, testament: "OT" },
+    { name: "Ruth", usfm: "RUT", file: "Ruth", chapters: 4, testament: "OT" },
+    { name: "1 Samuel", usfm: "1SA", file: "1Samuel", chapters: 31, testament: "OT" },
+    { name: "2 Samuel", usfm: "2SA", file: "2Samuel", chapters: 24, testament: "OT" },
+    { name: "1 Kings", usfm: "1KI", file: "1Kings", chapters: 22, testament: "OT" },
+    { name: "2 Kings", usfm: "2KI", file: "2Kings", chapters: 25, testament: "OT" },
+    { name: "1 Chronicles", usfm: "1CH", file: "1Chronicles", chapters: 29, testament: "OT" },
+    { name: "2 Chronicles", usfm: "2CH", file: "2Chronicles", chapters: 36, testament: "OT" },
+    { name: "Ezra", usfm: "EZR", file: "Ezra", chapters: 10, testament: "OT" },
+    { name: "Nehemiah", usfm: "NEH", file: "Nehemiah", chapters: 13, testament: "OT" },
+    { name: "Esther", usfm: "EST", file: "Esther", chapters: 10, testament: "OT" },
+    { name: "Job", usfm: "JOB", file: "Job", chapters: 42, testament: "OT" },
+    { name: "Psalms", usfm: "PSA", file: "Psalms", chapters: 150, testament: "OT" },
+    { name: "Proverbs", usfm: "PRO", file: "Proverbs", chapters: 31, testament: "OT" },
+    { name: "Ecclesiastes", usfm: "ECC", file: "Ecclesiastes", chapters: 12, testament: "OT" },
+    { name: "Song of Solomon", usfm: "SNG", file: "SongofSolomon", chapters: 8, testament: "OT" },
+    { name: "Isaiah", usfm: "ISA", file: "Isaiah", chapters: 66, testament: "OT" },
+    { name: "Jeremiah", usfm: "JER", file: "Jeremiah", chapters: 52, testament: "OT" },
+    { name: "Lamentations", usfm: "LAM", file: "Lamentations", chapters: 5, testament: "OT" },
+    { name: "Ezekiel", usfm: "EZK", file: "Ezekiel", chapters: 48, testament: "OT" },
+    { name: "Daniel", usfm: "DAN", file: "Daniel", chapters: 12, testament: "OT" },
+    { name: "Hosea", usfm: "HOS", file: "Hosea", chapters: 14, testament: "OT" },
+    { name: "Joel", usfm: "JOL", file: "Joel", chapters: 3, testament: "OT" },
+    { name: "Amos", usfm: "AMO", file: "Amos", chapters: 9, testament: "OT" },
+    { name: "Obadiah", usfm: "OBA", file: "Obadiah", chapters: 1, testament: "OT" },
+    { name: "Jonah", usfm: "JON", file: "Jonah", chapters: 4, testament: "OT" },
+    { name: "Micah", usfm: "MIC", file: "Micah", chapters: 7, testament: "OT" },
+    { name: "Nahum", usfm: "NAM", file: "Nahum", chapters: 3, testament: "OT" },
+    { name: "Habakkuk", usfm: "HAB", file: "Habakkuk", chapters: 3, testament: "OT" },
+    { name: "Zephaniah", usfm: "ZEP", file: "Zephaniah", chapters: 3, testament: "OT" },
+    { name: "Haggai", usfm: "HAG", file: "Haggai", chapters: 2, testament: "OT" },
+    { name: "Zechariah", usfm: "ZEC", file: "Zechariah", chapters: 14, testament: "OT" },
+    { name: "Malachi", usfm: "MAL", file: "Malachi", chapters: 4, testament: "OT" },
+    { name: "Matthew", usfm: "MAT", file: "Matthew", chapters: 28, testament: "NT" },
+    { name: "Mark", usfm: "MRK", file: "Mark", chapters: 16, testament: "NT" },
+    { name: "Luke", usfm: "LUK", file: "Luke", chapters: 24, testament: "NT" },
+    { name: "John", usfm: "JHN", file: "John", chapters: 21, testament: "NT" },
+    { name: "Acts", usfm: "ACT", file: "Acts", chapters: 28, testament: "NT" },
+    { name: "Romans", usfm: "ROM", file: "Romans", chapters: 16, testament: "NT" },
+    { name: "1 Corinthians", usfm: "1CO", file: "1Corinthians", chapters: 16, testament: "NT" },
+    { name: "2 Corinthians", usfm: "2CO", file: "2Corinthians", chapters: 13, testament: "NT" },
+    { name: "Galatians", usfm: "GAL", file: "Galatians", chapters: 6, testament: "NT" },
+    { name: "Ephesians", usfm: "EPH", file: "Ephesians", chapters: 6, testament: "NT" },
+    { name: "Philippians", usfm: "PHP", file: "Philippians", chapters: 4, testament: "NT" },
+    { name: "Colossians", usfm: "COL", file: "Colossians", chapters: 4, testament: "NT" },
+    { name: "1 Thessalonians", usfm: "1TH", file: "1Thessalonians", chapters: 5, testament: "NT" },
+    { name: "2 Thessalonians", usfm: "2TH", file: "2Thessalonians", chapters: 3, testament: "NT" },
+    { name: "1 Timothy", usfm: "1TI", file: "1Timothy", chapters: 6, testament: "NT" },
+    { name: "2 Timothy", usfm: "2TI", file: "2Timothy", chapters: 4, testament: "NT" },
+    { name: "Titus", usfm: "TIT", file: "Titus", chapters: 3, testament: "NT" },
+    { name: "Philemon", usfm: "PHM", file: "Philemon", chapters: 1, testament: "NT" },
+    { name: "Hebrews", usfm: "HEB", file: "Hebrews", chapters: 13, testament: "NT" },
+    { name: "James", usfm: "JAS", file: "James", chapters: 5, testament: "NT" },
+    { name: "1 Peter", usfm: "1PE", file: "1Peter", chapters: 5, testament: "NT" },
+    { name: "2 Peter", usfm: "2PE", file: "2Peter", chapters: 3, testament: "NT" },
+    { name: "1 John", usfm: "1JN", file: "1John", chapters: 5, testament: "NT" },
+    { name: "2 John", usfm: "2JN", file: "2John", chapters: 1, testament: "NT" },
+    { name: "3 John", usfm: "3JN", file: "3John", chapters: 1, testament: "NT" },
+    { name: "Jude", usfm: "JUD", file: "Jude", chapters: 1, testament: "NT" },
+    { name: "Revelation", usfm: "REV", file: "Revelation", chapters: 22, testament: "NT" },
+  ];
+  function bookByName(name) { return BOOKS.find((b) => b.name === name) || null; }
+
+  const ALIASES = {
+    Genesis: ["genesis", "gen", "ge", "gn"], Exodus: ["exodus", "exod", "exo", "ex"],
+    Leviticus: ["leviticus", "lev", "le", "lv"], Numbers: ["numbers", "num", "nu", "nm", "nb"],
+    Deuteronomy: ["deuteronomy", "deut", "dt", "de"], Joshua: ["joshua", "josh", "jos", "jsh"],
+    Judges: ["judges", "judg", "jdg", "jg"], Ruth: ["ruth", "rth", "ru"],
+    "1 Samuel": ["1 samuel", "1samuel", "1 sam", "1sam", "1 sa", "1sa"],
+    "2 Samuel": ["2 samuel", "2samuel", "2 sam", "2sam", "2 sa", "2sa"],
+    "1 Kings": ["1 kings", "1kings", "1 kgs", "1kgs", "1 ki", "1ki"],
+    "2 Kings": ["2 kings", "2kings", "2 kgs", "2kgs", "2 ki", "2ki"],
+    "1 Chronicles": ["1 chronicles", "1chronicles", "1 chron", "1chron", "1 chr", "1chr"],
+    "2 Chronicles": ["2 chronicles", "2chronicles", "2 chron", "2chron", "2 chr", "2chr"],
+    Ezra: ["ezra", "ezr"], Nehemiah: ["nehemiah", "neh", "ne"], Esther: ["esther", "esth", "est", "es"],
+    Job: ["job", "jb"], Psalms: ["psalms", "psalm", "ps", "psa", "pss"],
+    Proverbs: ["proverbs", "prov", "pro", "prv", "pr"], Ecclesiastes: ["ecclesiastes", "eccles", "eccl", "ecc", "ec"],
+    "Song of Solomon": ["song of solomon", "song of songs", "songofsolomon", "song", "sos", "sng"],
+    Isaiah: ["isaiah", "isa", "is"], Jeremiah: ["jeremiah", "jer", "je"], Lamentations: ["lamentations", "lam", "la"],
+    Ezekiel: ["ezekiel", "ezek", "eze", "ezk"], Daniel: ["daniel", "dan", "da", "dn"], Hosea: ["hosea", "hos", "ho"],
+    Joel: ["joel", "jl"], Amos: ["amos", "am"], Obadiah: ["obadiah", "obad", "oba", "ob"],
+    Jonah: ["jonah", "jon", "jnh"], Micah: ["micah", "mic", "mc"], Nahum: ["nahum", "nah", "na"],
+    Habakkuk: ["habakkuk", "hab", "hb"], Zephaniah: ["zephaniah", "zeph", "zep", "zp"],
+    Haggai: ["haggai", "hag", "hg"], Zechariah: ["zechariah", "zech", "zec", "zc"], Malachi: ["malachi", "mal", "ml"],
+    Matthew: ["matthew", "matt", "mat", "mt"], Mark: ["mark", "mrk", "mk", "mr"], Luke: ["luke", "luk", "lk"],
+    John: ["john", "jhn", "jn", "joh"], Acts: ["acts", "act", "ac"], Romans: ["romans", "rom", "ro", "rm"],
+    "1 Corinthians": ["1 corinthians", "1corinthians", "1 cor", "1cor", "1 co", "1co"],
+    "2 Corinthians": ["2 corinthians", "2corinthians", "2 cor", "2cor", "2 co", "2co"],
+    Galatians: ["galatians", "gal", "ga"], Ephesians: ["ephesians", "eph", "ep"],
+    Philippians: ["philippians", "phil", "php", "pp"], Colossians: ["colossians", "col", "co"],
+    "1 Thessalonians": ["1 thessalonians", "1thessalonians", "1 thess", "1thess", "1 th", "1th"],
+    "2 Thessalonians": ["2 thessalonians", "2thessalonians", "2 thess", "2thess", "2 th", "2th"],
+    "1 Timothy": ["1 timothy", "1timothy", "1 tim", "1tim", "1 ti", "1ti"],
+    "2 Timothy": ["2 timothy", "2timothy", "2 tim", "2tim", "2 ti", "2ti"],
+    Titus: ["titus", "tit", "ti"], Philemon: ["philemon", "philem", "phm", "pm"], Hebrews: ["hebrews", "heb"],
+    James: ["james", "jas", "jm"], "1 Peter": ["1 peter", "1peter", "1 pet", "1pet", "1 pe", "1pe"],
+    "2 Peter": ["2 peter", "2peter", "2 pet", "2pet", "2 pe", "2pe"],
+    "1 John": ["1 john", "1john", "1 jn", "1jn", "1 jo", "1jo"],
+    "2 John": ["2 john", "2john", "2 jn", "2jn", "2 jo", "2jo"],
+    "3 John": ["3 john", "3john", "3 jn", "3jn", "3 jo", "3jo"],
+    Jude: ["jude", "jud", "jd"], Revelation: ["revelation", "revelations", "rev", "re"],
+  };
+  const ALIAS_LIST = [];
+  for (const [canonical, aliases] of Object.entries(ALIASES)) {
+    for (const a of aliases) ALIAS_LIST.push([a, canonical]);
+  }
+  ALIAS_LIST.sort((a, b) => b[0].length - a[0].length);
+
+  function parseReference(raw) {
+    if (!raw) return null;
+    const input = raw.trim().toLowerCase().replace(/\s+/g, " ");
+    let matchedAlias = null, matchedCanonical = null;
+    for (const [alias, canonical] of ALIAS_LIST) {
+      if (input === alias || input.startsWith(alias + " ") || input.startsWith(alias + ".")) {
+        matchedAlias = alias; matchedCanonical = canonical; break;
+      }
+    }
+    if (!matchedCanonical) return null;
+    const book = bookByName(matchedCanonical);
+    if (!book) return null;
+    let rest = input.slice(matchedAlias.length).replace(/^\.?\s*/, "").trim();
+    if (!rest) return { book, chapter: 1, verseStart: null, verseEnd: null };
+    const m = rest.match(/^(\d+)(?::(\d+)(?:-(\d+))?)?/);
+    if (!m) return null;
+    if (book.chapters === 1 && !m[2]) {
+      const v = parseInt(m[1], 10);
+      return { book, chapter: 1, verseStart: v, verseEnd: v };
+    }
+    const chapter = parseInt(m[1], 10);
+    if (chapter < 1 || chapter > book.chapters) return null;
+    const verseStart = m[2] ? parseInt(m[2], 10) : null;
+    const verseEnd = m[3] ? parseInt(m[3], 10) : verseStart;
+    return { book, chapter, verseStart, verseEnd };
+  }
+
+  /* =====================================================================
+     Translations
+  ===================================================================== */
+  const TRANSLATIONS = {
+    KJV: { id: "KJV", name: "King James Version", bulk: true,
+      bookUrl: (b) => `https://raw.githubusercontent.com/aruljohn/Bible-kjv/master/${b.file}.json`,
+      apiId: "kjv" },
+    WEB: { id: "WEB", name: "World English Bible", bulk: true,
+      bookUrl: (b) => `https://raw.githubusercontent.com/aruljohn/Bible-wmb/master/${b.file}.json`,
+      apiId: "web" },
+    ASV: { id: "ASV", name: "American Standard Version", bulk: false, apiId: "asv" },
+    BBE: { id: "BBE", name: "Bible in Basic English", bulk: false, apiId: "bbe" },
+    DARBY: { id: "DARBY", name: "Darby Bible", bulk: false, apiId: "darby" },
+    YLT: { id: "YLT", name: "Young's Literal Translation", bulk: false, apiId: "ylt", ntOnly: true },
+  };
+  const TR_ORDER = ["KJV", "WEB", "ASV", "BBE", "DARBY", "YLT"];
+
+  function parseAruljohnBook(json) {
+    const out = [];
+    if (!json || !Array.isArray(json.chapters)) return out;
+    for (const ch of json.chapters) {
+      const chapterNum = parseInt(ch.chapter, 10);
+      if (!Array.isArray(ch.verses)) continue;
+      for (const v of ch.verses) {
+        out.push({ chapter: chapterNum, verse: parseInt(v.verse, 10),
+          text: String(v.text || "").replace(/^#\s*/, "").trim() });
+      }
+    }
+    return out;
+  }
+  function parseBibleApiResponse(json) {
+    const list = Array.isArray(json) ? json : (json && Array.isArray(json.verses)) ? json.verses : [];
+    return list.map((v) => ({ chapter: parseInt(v.chapter, 10), verse: parseInt(v.verse, 10),
+      text: String(v.text || "").trim() }));
+  }
+
+  /* =====================================================================
+     IndexedDB layer
+  ===================================================================== */
+  const DB_NAME = "berea";
+  const DB_VERSION = 1;
+  let _dbPromise = null;
+
+  function openDB() {
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains("verses")) {
+          const store = db.createObjectStore("verses", { keyPath: "key" });
+          store.createIndex("byTranslation", "tr", { unique: false });
+          store.createIndex("byChapter", ["tr", "book", "chapter"], { unique: false });
+        }
+        if (!db.objectStoreNames.contains("meta")) {
+          db.createObjectStore("meta", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("highlights")) {
+          db.createObjectStore("highlights", { keyPath: "ref" });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return _dbPromise;
+  }
+
+  function idbReq(req) {
+    return new Promise((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function putVersesBulk(tr, bookName, rows) {
+    if (!rows.length) return;
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction("verses", "readwrite");
+      const store = tx.objectStore("verses");
+      for (const r of rows) {
+        store.put({ key: `${tr}|${bookName}|${r.chapter}|${r.verse}`, tr, book: bookName,
+          chapter: r.chapter, verse: r.verse, text: r.text });
+      }
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function getChapterFromDB(tr, bookName, chapter) {
+    const db = await openDB();
+    const tx = db.transaction("verses", "readonly");
+    const idx = tx.objectStore("verses").index("byChapter");
+    const rows = await idbReq(idx.getAll(IDBKeyRange.only([tr, bookName, chapter])));
+    rows.sort((a, b) => a.verse - b.verse);
+    return rows;
+  }
+
+  async function setMeta(id, data) {
+    const db = await openDB();
+    const tx = db.transaction("meta", "readwrite");
+    tx.objectStore("meta").put(Object.assign({ id }, data));
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function getMeta(id) {
+    const db = await openDB();
+    const tx = db.transaction("meta", "readonly");
+    return (await idbReq(tx.objectStore("meta").get(id))) || null;
+  }
+
+  async function getHighlight(ref) {
+    const db = await openDB();
+    const tx = db.transaction("highlights", "readonly");
+    const rec = await idbReq(tx.objectStore("highlights").get(ref));
+    return rec ? rec.color : null;
+  }
+  async function setHighlight(ref, color) {
+    const db = await openDB();
+    const tx = db.transaction("highlights", "readwrite");
+    if (color) tx.objectStore("highlights").put({ ref, color });
+    else tx.objectStore("highlights").delete(ref);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function getAllHighlightsForChapter(bookName, chapter) {
+    const db = await openDB();
+    const tx = db.transaction("highlights", "readonly");
+    const all = await idbReq(tx.objectStore("highlights").getAll());
+    const prefix = `${bookName}|${chapter}|`;
+    const map = {};
+    for (const h of all) if (h.ref.startsWith(prefix)) map[h.ref.split("|")[2]] = h.color;
+    return map;
+  }
+
+  /* ---- fetching + progressive caching ---- */
+  async function fetchLiveChapter(trId, book, chapter) {
+    const src = TRANSLATIONS[trId];
+    if (src.ntOnly && book.testament !== "NT") {
+      throw new Error(`${trId} only covers the New Testament`);
+    }
+    const url = `https://bible-api.com/data/${src.apiId}/${book.usfm}/${chapter}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`bible-api.com ${res.status}`);
+    const json = await res.json();
+    const rows = parseBibleApiResponse(json).map((r) => Object.assign({ book: book.name }, r));
+    await putVersesBulk(trId, book.name, rows);
+    return rows;
+  }
+
+  async function getChapterVerses(trId, book, chapter) {
+    const cached = await getChapterFromDB(trId, book.name, chapter);
+    if (cached.length > 0) return cached;
+    return await fetchLiveChapter(trId, book, chapter);
+  }
+
+  async function downloadTranslation(trId, onProgress) {
+    const src = TRANSLATIONS[trId];
+    let done = 0, failed = [];
+    for (const book of BOOKS) {
+      try {
+        const res = await fetch(src.bookUrl(book));
+        if (!res.ok) throw new Error(String(res.status));
+        const json = await res.json();
+        const rows = parseAruljohnBook(json);
+        await putVersesBulk(trId, book.name, rows);
+      } catch (e) {
+        console.error("Download failed for", trId, book.name, e);
+        failed.push(book.name);
+      }
+      done++;
+      onProgress(done, BOOKS.length);
+    }
+    await setMeta(trId, { downloaded: failed.length === 0, partial: failed.length > 0,
+      failedBooks: failed, downloadedAt: Date.now() });
+    return failed;
+  }
+
+  /* =====================================================================
+     Tabs (localStorage) + Highlights color cycle
+  ===================================================================== */
+  const HL_CYCLE = [null, "yellow", "green", "blue", "pink"];
+
+  function loadTabs() {
+    try { return JSON.parse(localStorage.getItem("berea.tabs") || "[]"); }
+    catch (e) { return []; }
+  }
+  function saveTabs(tabs) { localStorage.setItem("berea.tabs", JSON.stringify(tabs)); }
+
+  function seedDefaultTabsIfEmpty() {
+    if (localStorage.getItem("berea.seeded")) return;
+    localStorage.setItem("berea.seeded", "1");
+    const tabs = [
+      { id: "t_cross", label: "Cry from the Cross", translationId: "KJV",
+        refs: [
+          { book: "Matthew", chapter: 27, verseStart: 46, verseEnd: 46 },
+          { book: "Psalms", chapter: 22, verseStart: 1, verseEnd: 1 },
+        ] },
+      { id: "t_jn316", label: "For God So Loved", translationId: "KJV",
+        refs: [ { book: "John", chapter: 3, verseStart: 16, verseEnd: 16 } ] },
+    ];
+    saveTabs(tabs);
+  }
+
+  /* =====================================================================
+     App state + rendering
+  ===================================================================== */
+  const state = {
+    view: "read",
+    book: bookByName("John"),
+    chapter: 3,
+    readTr: "KJV",
+    compareLeft: "KJV",
+    compareRight: "ASV",
+    activeTabId: null,
+    verseFocus: null,
+  };
+  let searchIndexCache = {};
+
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function toast(msg) {
+    const el = $("#toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove("show"), 1800);
+  }
+
+  function setView(name) {
+    state.view = name;
+    $$(".view").forEach((v) => v.classList.remove("active"));
+    $("#view-" + name).classList.add("active");
+    $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+    $("#content").scrollTop = 0;
+    if (name === "read") renderRead();
+    if (name === "compare") renderCompare();
+    if (name === "search") renderSearchTr();
+    if (name === "library") { renderLibrary(); renderAiPanel(); renderApologeticsList(); }
+    if (name === "study") renderStudyView();
+  }
+
+  function refLabel(book, chapter, verseStart, verseEnd) {
+    let s = `${book} ${chapter}`;
+    if (verseStart) s += verseEnd && verseEnd !== verseStart ? `:${verseStart}-${verseEnd}` : `:${verseStart}`;
+    return s;
+  }
+
+  function renderVerseHtml(row, highlightMap, focusVerse) {
+    const color = highlightMap[row.verse];
+    const cls = ["verse"];
+    if (color) cls.push("hl-" + color);
+    if (focusVerse && row.verse === focusVerse) cls.push("flash");
+    return `<span class="${cls.join(" ")}" data-book="${escapeHtml(row.book)}" data-chapter="${row.chapter}" data-verse="${row.verse}"><sup class="vnum">${row.verse}</sup>${escapeHtml(row.text)} </span>`;
+  }
+
+  /* ---- Read view ---- */
+  async function renderRead() {
+    $("#refBtn").textContent = `${state.book.name} ${state.chapter}`;
+    $("#trBadge").value = state.readTr;
+    $("#readChapterTitle").textContent = `${state.book.name} ${state.chapter}`;
+    $("#readBody").innerHTML = `<div class="page-loading">Loading…</div>`;
+    try {
+      const [rows, hl] = await Promise.all([
+        getChapterVerses(state.readTr, state.book, state.chapter),
+        getAllHighlightsForChapter(state.book.name, state.chapter),
+      ]);
+      if (!rows.length) {
+        $("#readBody").innerHTML = `<div class="hint">Couldn't load this chapter (offline, and not cached yet). Try again once you're back online, or download ${state.readTr} in Library for full offline access.</div>`;
+        return;
+      }
+      $("#readBody").innerHTML = rows.map((r) => renderVerseHtml(r, hl, state.verseFocus)).join("");
+      state.verseFocus = null;
+    } catch (e) {
+      const msg = (e && e.message && e.message.includes("only covers")) ? e.message : "Couldn't load this chapter. Check your connection and try again.";
+      $("#readBody").innerHTML = `<div class="hint">${escapeHtml(msg)}</div>`;
+    }
+  }
+
+  /* ---- Compare view ---- */
+  async function renderCompare() {
+    $("#refBtn").textContent = `${state.book.name} ${state.chapter}`;
+    const spread = $("#compareSpread");
+    spread.innerHTML = ["compareLeft", "compareRight"].map((key, i) => `
+      <div class="page">
+        <div class="page-head">
+          <span>${i === 0 ? "Left" : "Right"} page</span>
+          <select data-side="${key}">${TR_ORDER.map((t) => `<option value="${t}" ${state[key] === t ? "selected" : ""}>${t}</option>`).join("")}</select>
+        </div>
+        <div class="verseflow" data-pane="${key}"><span class="page-loading">Loading…</span></div>
+      </div>`).join("");
+
+    spread.querySelectorAll("select").forEach((sel) => {
+      sel.addEventListener("change", () => { state[sel.dataset.side] = sel.value; renderCompare(); });
+    });
+
+    for (const key of ["compareLeft", "compareRight"]) {
+      const trId = state[key];
+      const pane = spread.querySelector(`[data-pane="${key}"]`);
+      try {
+        const [rows, hl] = await Promise.all([
+          getChapterVerses(trId, state.book, state.chapter),
+          getAllHighlightsForChapter(state.book.name, state.chapter),
+        ]);
+        pane.innerHTML = rows.length
+          ? rows.map((r) => renderVerseHtml(r, hl, state.verseFocus)).join("")
+          : `<span class="page-loading">Not available offline yet.</span>`;
+      } catch (e) {
+        pane.innerHTML = `<span class="page-loading">Couldn't load.</span>`;
+      }
+    }
+    state.verseFocus = null;
+  }
+
+  /* ---- Tab (cross-reference) view ---- */
+  function renderTabStrip() {
+    const tabs = loadTabs();
+    const strip = $("#tabstrip");
+    strip.innerHTML = tabs.map((t) => `
+      <div class="tabpill" data-tab="${t.id}">
+        <span class="tlabel">${escapeHtml(t.label)}</span>
+        <span class="x" data-del="${t.id}">×</span>
+      </div>`).join("") + `<div class="tabpill add" id="tabAddBtn">+ tab</div>`;
+
+    strip.querySelectorAll(".tabpill[data-tab]").forEach((el) => {
+      el.querySelector(".tlabel").addEventListener("click", () => openTab(el.dataset.tab));
+      el.querySelector(".x").addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (confirm("Remove this tab?")) {
+          const remaining = loadTabs().filter((t) => t.id !== el.dataset.tab);
+          saveTabs(remaining);
+          renderTabStrip();
+          if (state.activeTabId === el.dataset.tab) setView("read");
+        }
+      });
+    });
+    $("#tabAddBtn").addEventListener("click", () => {
+      pinCurrentAsNewTab();
+    });
+  }
+
+  async function openTab(tabId) {
+    const tabs = loadTabs();
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    state.activeTabId = tabId;
+    state.view = "tab";
+    $$(".view").forEach((v) => v.classList.remove("active"));
+    $("#view-tab").classList.add("active");
+    $$("#bottomnav button").forEach((b) => b.classList.remove("active"));
+    $("#content").scrollTop = 0;
+    await renderTabView(tab);
+  }
+
+  async function renderTabView(tab) {
+    $("#refBtn").textContent = tab.label;
+    $("#tabViewHead").innerHTML = `
+      <h1 class="chapter-title" style="margin-bottom:4px">${escapeHtml(tab.label)}</h1>
+      <div class="hint" style="margin-bottom:12px">Reading in <strong>${tab.translationId}</strong> — cross-referenced passages, side by side.</div>`;
+    const spread = $("#tabSpread");
+    spread.innerHTML = tab.refs.map((r, i) => `
+      <div class="page">
+        <div class="page-title">${refLabel(r.book, r.chapter, r.verseStart, r.verseEnd)}</div>
+        <div class="verseflow" data-idx="${i}"><span class="page-loading">Loading…</span></div>
+      </div>`).join("");
+
+    for (let i = 0; i < tab.refs.length; i++) {
+      const r = tab.refs[i];
+      const book = bookByName(r.book);
+      const pane = spread.querySelector(`[data-idx="${i}"]`);
+      if (!book) { pane.innerHTML = `<span class="page-loading">Unknown book.</span>`; continue; }
+      try {
+        const [rows, hl] = await Promise.all([
+          getChapterVerses(tab.translationId, book, r.chapter),
+          getAllHighlightsForChapter(book.name, r.chapter),
+        ]);
+        const filtered = r.verseStart
+          ? rows.filter((v) => v.verse >= r.verseStart && v.verse <= r.verseEnd)
+          : rows;
+        pane.innerHTML = filtered.length
+          ? filtered.map((v) => renderVerseHtml(v, hl, null)).join("")
+          : `<span class="page-loading">Not available offline yet.</span>`;
+      } catch (e) {
+        pane.innerHTML = `<span class="page-loading">Couldn't load.</span>`;
+      }
+    }
+
+    $("#tabAddRow").innerHTML = `<button class="sheet-actions button" id="addPassageBtn" style="width:100%;margin-top:4px;font-family:var(--font-ui);font-weight:600;padding:11px;border-radius:9px;border:1px dashed var(--gilt-soft);background:var(--panel);color:var(--cover)">+ Add a cross-reference passage</button>`;
+    $("#addPassageBtn").addEventListener("click", () => {
+      const raw = prompt('Add a reference (e.g. "Romans 8:38-39")');
+      if (!raw) return;
+      const parsed = parseReference(raw);
+      if (!parsed) { toast("Couldn't understand that reference."); return; }
+      const tabs = loadTabs();
+      const t = tabs.find((x) => x.id === tab.id);
+      t.refs.push({ book: parsed.book.name, chapter: parsed.chapter,
+        verseStart: parsed.verseStart, verseEnd: parsed.verseEnd });
+      saveTabs(tabs);
+      broadcastTabUpdate(t.id, t.refs);
+      renderTabView(t);
+    });
+  }
+
+  function pinCurrentAsNewTab() {
+    const label = prompt("Label for this tab?", refLabel(state.book.name, state.chapter, null, null));
+    if (!label) return;
+    const tabs = loadTabs();
+    const newTab = { id: "t_" + Date.now(), label, translationId: state.readTr,
+      refs: [{ book: state.book.name, chapter: state.chapter, verseStart: null, verseEnd: null }] };
+    tabs.push(newTab);
+    saveTabs(tabs);
+    renderTabStrip();
+    broadcastTabAdd(newTab);
+    toast("Tab added");
+  }
+
+  /* ---- Search view ---- */
+  function renderSearchTr() {
+    const sel = $("#searchTr");
+    sel.innerHTML = TR_ORDER.map((t) => `<option value="${t}">${t}</option>`).join("");
+    sel.value = state.readTr;
+    setSearchMode("verses");
+  }
+
+  async function buildSearchIndex(trId) {
+    if (searchIndexCache[trId]) return searchIndexCache[trId];
+    const db = await openDB();
+    const tx = db.transaction("verses", "readonly");
+    const idx = tx.objectStore("verses").index("byTranslation");
+    const rows = await idbReq(idx.getAll(IDBKeyRange.only(trId)));
+    searchIndexCache[trId] = rows;
+    return rows;
+  }
+
+  async function runSearch(trId, query) {
+    const results = $("#searchResults");
+    results.innerHTML = `<div class="page-loading">Searching…</div>`;
+    const rows = await buildSearchIndex(trId);
+    if (!rows.length) {
+      results.innerHTML = `<div class="hint">No ${trId} text cached yet to search. Read a few chapters or download it in <button class="link" id="goLibrary">Library</button> first.</div>`;
+      $("#goLibrary")?.addEventListener("click", () => { setView("library"); $$("#bottomnav button").forEach(b=>b.classList.toggle("active", b.dataset.view==="library")); });
+      return;
+    }
+    const q = query.trim().toLowerCase();
+    if (!q) { results.innerHTML = ""; return; }
+    const matches = rows.filter((r) => r.text.toLowerCase().includes(q)).slice(0, 150);
+    if (!matches.length) {
+      results.innerHTML = `<div class="hint">No verses found for “${escapeHtml(query)}.” Try a shorter word or check the spelling.</div>`;
+      return;
+    }
+    matches.sort((a, b) => a.book === b.book ? a.chapter - b.chapter || a.verse - b.verse : BOOKS.findIndex(bk=>bk.name===a.book) - BOOKS.findIndex(bk=>bk.name===b.book));
+    results.innerHTML = matches.map((r, i) => {
+      const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+      const snippet = escapeHtml(r.text).replace(re, "<mark>$1</mark>");
+      return `<div class="result" data-i="${i}">
+        <div class="result-ref">${r.book} ${r.chapter}:${r.verse} · ${trId}</div>
+        <div class="result-text">${snippet}</div>
+        <div class="result-actions"><button data-pin="${i}">+ pin as tab</button></div>
+      </div>`;
+    }).join("");
+    results.querySelectorAll(".result").forEach((el) => {
+      el.addEventListener("click", (ev) => {
+        if (ev.target.closest("[data-pin]")) return;
+        const r = matches[parseInt(el.dataset.i, 10)];
+        state.book = bookByName(r.book); state.chapter = r.chapter; state.verseFocus = r.verse;
+        state.readTr = trId;
+        setView("read");
+      });
+    });
+    results.querySelectorAll("[data-pin]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const r = matches[parseInt(btn.dataset.pin, 10)];
+        const tabs = loadTabs();
+        const newTab = { id: "t_" + Date.now(), label: `${r.book} ${r.chapter}:${r.verse}`, translationId: trId,
+          refs: [{ book: r.book, chapter: r.chapter, verseStart: r.verse, verseEnd: r.verse }] };
+        tabs.push(newTab);
+        saveTabs(tabs);
+        renderTabStrip();
+        broadcastTabAdd(newTab);
+        toast("Pinned as tab");
+      });
+    });
+  }
+
+  function setSearchMode(mode) {
+    $$("#searchModeToggle button").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+    $("#searchForm").style.display = mode === "verses" ? "flex" : "none";
+    $("#tabSearchForm").style.display = mode === "tabs" ? "flex" : "none";
+    $("#searchResults").innerHTML = "";
+    if (mode === "tabs") runTabSearch($("#tabSearchInput").value);
+  }
+
+  function runTabSearch(query) {
+    const results = $("#searchResults");
+    const tabs = loadTabs();
+    const q = query.trim().toLowerCase();
+    const matchesRef = (ref, qq) => `${ref.book} ${ref.chapter}`.toLowerCase().includes(qq) || refLabel(ref.book, ref.chapter, ref.verseStart, ref.verseEnd).toLowerCase().includes(qq);
+    const matches = !q ? tabs : tabs.filter((t) => t.label.toLowerCase().includes(q) || t.refs.some((r) => matchesRef(r, q)));
+    if (!tabs.length) {
+      results.innerHTML = `<div class="hint">You don't have any tabs yet. Pin a verse or passage from the reader to create one.</div>`;
+      return;
+    }
+    if (!matches.length) {
+      results.innerHTML = `<div class="hint">No tabs match “${escapeHtml(query)}.”</div>`;
+      return;
+    }
+    results.innerHTML = matches.map((t, i) => `
+      <div class="result" data-i="${i}">
+        <div class="result-ref">${t.refs.length} passage${t.refs.length === 1 ? "" : "s"} · ${t.translationId}</div>
+        <div class="result-text"><strong>${escapeHtml(t.label)}</strong><br><span style="color:var(--ink-soft);font-size:13.5px">${
+          t.refs.map((r) => escapeHtml(refLabel(r.book, r.chapter, r.verseStart, r.verseEnd))).join(" · ")
+        }</span></div>
+      </div>`).join("");
+    results.querySelectorAll(".result").forEach((el) => {
+      el.addEventListener("click", () => openTab(matches[parseInt(el.dataset.i, 10)].id));
+    });
+  }
+
+  /* ---- Library view ---- */
+  async function renderLibrary() {
+    const wrap = $("#trcards");
+    wrap.innerHTML = "";
+    for (const trId of TR_ORDER) {
+      const src = TRANSLATIONS[trId];
+      const meta = await getMeta(trId);
+      const card = document.createElement("div");
+      card.className = "trcard";
+      const statusText = meta && meta.downloaded ? "Downloaded — full offline access"
+        : meta && meta.partial ? `Mostly downloaded (${meta.failedBooks.length} book(s) skipped — tap Retry)`
+        : src.bulk ? "Not downloaded yet — chapters load live as you read"
+        : "Loads live as you read; caches automatically for offline reuse";
+      card.innerHTML = `
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">${trId} <span style="color:var(--ink-faint);font-weight:400;font-family:var(--font-ui);font-size:12px">${src.name}</span></div>
+            <div class="trcard-status">${statusText}</div>
+          </div>
+          ${src.bulk ? `<button class="dl" data-tr="${trId}">${meta && meta.downloaded ? "Re-download" : meta && meta.partial ? "Retry" : "Download"}</button>` : ""}
+        </div>
+        <div class="progress-track" id="prog-${trId}"><div class="progress-fill" id="progfill-${trId}"></div></div>
+      `;
+      wrap.appendChild(card);
+    }
+    wrap.querySelectorAll("button[data-tr]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const trId = btn.dataset.tr;
+        btn.disabled = true;
+        const track = $("#prog-" + trId), fill = $("#progfill-" + trId);
+        track.classList.add("show");
+        const failed = await downloadTranslation(trId, (done, total) => {
+          fill.style.width = Math.round((done / total) * 100) + "%";
+        });
+        btn.disabled = false;
+        searchIndexCache[trId] = null;
+        if (failed.length) toast(`${trId}: ${failed.length} book(s) failed — tap Retry`);
+        else toast(`${trId} downloaded`);
+        renderLibrary();
+      });
+    });
+  }
+
+  /* =====================================================================
+     Book / chapter picker
+  ===================================================================== */
+  function openPicker() {
+    $("#pickerBackdrop").classList.add("show");
+    renderPickerBooks();
+  }
+  function closePicker() { $("#pickerBackdrop").classList.remove("show"); }
+
+  function renderPickerBooks() {
+    $("#pickerTitle").textContent = "Choose a book";
+    const ot = BOOKS.filter((b) => b.testament === "OT");
+    const nt = BOOKS.filter((b) => b.testament === "NT");
+    const section = (label, list) => `<div class="testament-label">${label}</div><div class="book-grid">${
+      list.map((b) => `<button class="book-btn" data-book="${escapeHtml(b.name)}">${b.name}</button>`).join("")
+    }</div>`;
+    $("#pickerBody").innerHTML = section("Old Testament", ot) + section("New Testament", nt);
+    $("#pickerBody").querySelectorAll(".book-btn").forEach((btn) => {
+      btn.addEventListener("click", () => renderPickerChapters(bookByName(btn.dataset.book)));
+    });
+  }
+
+  function renderPickerChapters(book) {
+    $("#pickerTitle").textContent = book.name;
+    const nums = Array.from({ length: book.chapters }, (_, i) => i + 1);
+    $("#pickerBody").innerHTML =
+      `<div class="back-row"><button id="backToBooks">‹ All books</button></div>` +
+      `<div class="chapter-grid">${nums.map((n) => `<button class="chapter-btn" data-ch="${n}">${n}</button>`).join("")}</div>`;
+    $("#backToBooks").addEventListener("click", renderPickerBooks);
+    $("#pickerBody").querySelectorAll(".chapter-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.book = book;
+        state.chapter = parseInt(btn.dataset.ch, 10);
+        closePicker();
+        setView(state.view === "compare" ? "compare" : "read");
+        broadcastNavIfLeader();
+      });
+    });
+  }
+
+  /* =====================================================================
+     Verse action sheet
+  ===================================================================== */
+  let sheetCtx = null;
+
+  function openVerseSheet(bookName, chapter, verse, text) {
+    sheetCtx = { book: bookName, chapter, verse, text };
+    $("#vsRef").textContent = `${bookName} ${chapter}:${verse}`;
+    $("#vsText").textContent = text;
+    getHighlight(`${bookName}|${chapter}|${verse}`).then((current) => {
+      $("#vsSwatches").innerHTML = HL_CYCLE.map((c) => {
+        const cls = c ? "swatch hl-" + c : "swatch none";
+        const ring = current === c ? "box-shadow:0 0 0 2px var(--cover);" : "";
+        return `<button class="${cls}" style="${ring}" data-color="${c || ""}"></button>`;
+      }).join("");
+      $("#vsSwatches").querySelectorAll("button").forEach((b) => {
+        b.addEventListener("click", async () => {
+          await setHighlight(`${bookName}|${chapter}|${verse}`, b.dataset.color || null);
+          closeVerseSheet();
+          if (state.view === "read") renderRead();
+          else if (state.view === "compare") renderCompare();
+          else if (state.view === "tab" && state.activeTabId) openTab(state.activeTabId);
+        });
+      });
+    });
+
+    const tabs = loadTabs();
+    let actions = `<button class="primary" id="vsPinNew">Pin as new tab</button>`;
+    if (tabs.length) {
+      actions += `<select id="vsAddExisting"><option value="">Add to existing tab…</option>${
+        tabs.map((t) => `<option value="${t.id}">${escapeHtml(t.label)}</option>`).join("")}</select>`;
+    }
+    actions += `<button id="vsAskAi">✦ Find cross-references (AI)</button>`;
+    actions += `<button id="vsCopy">Copy text</button><button id="vsClose">Close</button>`;
+    $("#vsActions").innerHTML = actions;
+
+    $("#vsPinNew").addEventListener("click", () => {
+      const label = prompt("Label for this tab?", `${bookName} ${chapter}:${verse}`);
+      if (!label) return;
+      const t = loadTabs();
+      const newTab = { id: "t_" + Date.now(), label, translationId: state.readTr,
+        refs: [{ book: bookName, chapter, verseStart: verse, verseEnd: verse }] };
+      t.push(newTab);
+      saveTabs(t);
+      renderTabStrip();
+      broadcastTabAdd(newTab);
+      closeVerseSheet();
+      toast("Pinned as tab");
+    });
+    $("#vsAddExisting")?.addEventListener("change", (ev) => {
+      const id = ev.target.value;
+      if (!id) return;
+      const t = loadTabs();
+      const tab = t.find((x) => x.id === id);
+      tab.refs.push({ book: bookName, chapter, verseStart: verse, verseEnd: verse });
+      saveTabs(t);
+      broadcastTabUpdate(tab.id, tab.refs);
+      closeVerseSheet();
+      toast("Added to " + tab.label);
+    });
+    $("#vsCopy").addEventListener("click", () => {
+      const s = `${bookName} ${chapter}:${verse} — ${text}`;
+      if (navigator.clipboard) navigator.clipboard.writeText(s).then(() => toast("Copied"));
+      closeVerseSheet();
+    });
+    $("#vsAskAi").addEventListener("click", () => {
+      closeVerseSheet();
+      openAiSuggestSheet(bookName, chapter, verse, verse, text);
+    });
+    $("#vsClose").addEventListener("click", closeVerseSheet);
+
+    $("#verseSheetBackdrop").classList.add("show");
+  }
+  function closeVerseSheet() { $("#verseSheetBackdrop").classList.remove("show"); }
+
+  document.addEventListener("click", (ev) => {
+    const v = ev.target.closest(".verse");
+    if (!v) return;
+    openVerseSheet(v.dataset.book, parseInt(v.dataset.chapter, 10), parseInt(v.dataset.verse, 10), v.textContent.trim());
+  });
+
+  /* =====================================================================
+     AI-assisted cross-references
+     ---------------------------------------------------------------------
+     Bring-your-own-API-key: nothing about this touches a server we run.
+     Anthropic and OpenAI both support direct browser calls (Anthropic via
+     the "anthropic-dangerous-direct-browser-access" header; OpenAI-
+     compatible endpoints generally allow CORS already), so this is a
+     plain fetch() straight from the page to the provider. The tradeoff
+     that comes with that: the key sits in this browser's localStorage in
+     plain text, visible to anyone else who uses the device.
+  ===================================================================== */
+  function getAiConfig() {
+    try {
+      const raw = localStorage.getItem("berea.ai.config");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function saveAiConfig(cfg) { localStorage.setItem("berea.ai.config", JSON.stringify(cfg)); }
+
+  let aiConfigSavedCallback = null;
+  function openAiConfigSheet(onSaved) {
+    const existing = getAiConfig() || { provider: "anthropic" };
+    $("#aiProvider").value = existing.provider || "anthropic";
+    $("#aiKeyInput").value = existing.key || "";
+    $("#aiModelInput").value = existing.model || "";
+    $("#aiBaseUrlInput").value = existing.baseUrl || "";
+    $("#aiBaseUrlInput").style.display = existing.provider === "custom" ? "block" : "none";
+    aiConfigSavedCallback = onSaved || null;
+    $("#aiConfigBackdrop").classList.add("show");
+  }
+  function closeAiConfigSheet() { $("#aiConfigBackdrop").classList.remove("show"); }
+
+  async function callAnthropic(cfg, prompt) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": cfg.key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: cfg.model || "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data.error && data.error.message) || `Anthropic API error (${res.status})`);
+    return ((data.content || []).map((b) => b.text || "").join(""));
+  }
+
+  async function callOpenAiCompatible(cfg, prompt) {
+    const base = (cfg.provider === "openai" ? "https://api.openai.com/v1" : (cfg.baseUrl || "https://api.openai.com/v1")).replace(/\/$/, "");
+    const res = await fetch(base + "/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + cfg.key },
+      body: JSON.stringify({
+        model: cfg.model || "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data.error && data.error.message) || `API error (${res.status})`);
+    return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+  }
+
+  function parseAiSuggestions(raw) {
+    let text = String(raw || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
+    let data;
+    try { data = JSON.parse(text); }
+    catch (e) {
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("Couldn't understand the AI's response.");
+      try { data = JSON.parse(m[0]); } catch (e2) { throw new Error("Couldn't understand the AI's response."); }
+    }
+    const list = (data && Array.isArray(data.suggestions)) ? data.suggestions : [];
+    const out = [];
+    for (const s of list) {
+      const parsed = parseReference(String(s.reference || ""));
+      if (!parsed) continue;
+      out.push({
+        book: parsed.book.name, chapter: parsed.chapter,
+        verseStart: parsed.verseStart, verseEnd: parsed.verseEnd,
+        note: String(s.note || "").slice(0, 240),
+        type: ["cross-reference", "thematic", "undesigned-coincidence"].includes(s.type) ? s.type : "cross-reference",
+      });
+    }
+    return out;
+  }
+
+  async function queryAiForCorrelations(refText, passageText) {
+    const cfg = getAiConfig();
+    if (!cfg) throw new Error("no-config");
+    const prompt = "You are assisting with Bible study cross-referencing. For this passage \u2014 " + refText + ': "' + passageText + '" \u2014 suggest up to 6 genuinely illuminating cross-references: verses that quote it, are quoted by it, fulfill it, parallel it thematically, or form an \u201cundesigned coincidence\u201d (an incidental detail in another passage that interlocks with this one in a way that looks unplanned, sometimes used as evidence of authenticity). For each, give one short sentence on why it connects. Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this shape: {"suggestions":[{"reference":"Book Chapter:Verse","note":"...","type":"cross-reference"}]}. Use "type" values only from: cross-reference, thematic, undesigned-coincidence.';
+    const raw = cfg.provider === "anthropic" ? await callAnthropic(cfg, prompt) : await callOpenAiCompatible(cfg, prompt);
+    return parseAiSuggestions(raw);
+  }
+
+  let currentAiSuggestions = [];
+  let currentAiSeed = null;
+
+  function openAiSuggestSheet(bookName, chapter, verseStart, verseEnd, text) {
+    const cfg = getAiConfig();
+    if (!cfg) { openAiConfigSheet(() => openAiSuggestSheet(bookName, chapter, verseStart, verseEnd, text)); return; }
+    currentAiSeed = { book: bookName, chapter, verseStart, verseEnd };
+    const refText = refLabel(bookName, chapter, verseStart, verseEnd);
+    $("#aiSuggestRef").textContent = refText;
+    const who = cfg.provider === "anthropic" ? "Claude" : cfg.provider === "openai" ? "OpenAI" : "your AI";
+    $("#aiSuggestStatus").textContent = "Asking " + who + " for cross-references\u2026";
+    $("#aiSuggestList").innerHTML = "";
+    currentAiSuggestions = [];
+    $("#aiSuggestBackdrop").classList.add("show");
+
+    queryAiForCorrelations(refText, text).then((suggestions) => {
+      currentAiSuggestions = suggestions;
+      if (!suggestions.length) {
+        $("#aiSuggestStatus").textContent = "No suggestions came back. Try again, or check the API key and model in settings.";
+        return;
+      }
+      $("#aiSuggestStatus").textContent = suggestions.length + " suggestion" + (suggestions.length === 1 ? "" : "s") + " \u2014 review and add what's useful.";
+      $("#aiSuggestList").innerHTML = suggestions.map((s, i) => `
+        <label class="ai-suggestion">
+          <input type="checkbox" data-i="${i}" checked>
+          <div>
+            <span class="ai-type">${escapeHtml(s.type)}</span><br>
+            <span class="ai-ref">${escapeHtml(refLabel(s.book, s.chapter, s.verseStart, s.verseEnd))}</span>
+            <div class="ai-note">${escapeHtml(s.note)}</div>
+          </div>
+        </label>`).join("");
+    }).catch((err) => {
+      $("#aiSuggestStatus").textContent = "Couldn't get suggestions: " + (err && err.message ? err.message : "unknown error") + ". Check the API key in settings and try again.";
+    });
+  }
+
+  function renderAiPanel() {
+    const wrap = $("#aiPanel");
+    if (!wrap) return;
+    const cfg = getAiConfig();
+    const who = cfg ? (cfg.provider === "anthropic" ? "Claude" : cfg.provider === "openai" ? "OpenAI" : "Custom provider") : "Not configured";
+    wrap.innerHTML = `
+      <div class="trcard">
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">${who}</div>
+            <div class="trcard-status">${cfg ? "Key saved in this browser" + (cfg.model ? " \u00b7 model: " + escapeHtml(cfg.model) : "") : "Add your own API key to enable this"}</div>
+          </div>
+          <button class="dl" id="aiConfigBtn">${cfg ? "Change" : "Set up"}</button>
+        </div>
+      </div>
+      <button class="dl" id="aiAskChapterBtn" style="width:100%;margin-top:10px">\u2726 Find correlations for ${escapeHtml(state.book.name)} ${state.chapter}</button>
+    `;
+    $("#aiConfigBtn").addEventListener("click", () => openAiConfigSheet(renderAiPanel));
+    $("#aiAskChapterBtn").addEventListener("click", async () => {
+      let text = "";
+      try {
+        const rows = await getChapterVerses(state.readTr, state.book, state.chapter);
+        text = rows.map((r) => r.verse + ". " + r.text).join(" ").slice(0, 1200);
+      } catch (e) { /* fall back to reference-only prompt */ }
+      openAiSuggestSheet(state.book.name, state.chapter, null, null, text);
+    });
+  }
+
+  /* =====================================================================
+     Apologetics practice content
+     Static, authored content — objections stated fairly, a response
+     outline, and the passages that back it up (tap "Save as a tab" to
+     pull them into the normal cross-reference tab system).
+  ===================================================================== */
+  const APOLOGETICS = [
+    { id: "evil", title: "If God is good, why is there evil and suffering?",
+      objection: "A perfectly good, all-powerful God should be both willing and able to prevent evil. Since evil clearly exists \u2014 natural disasters, disease, cruelty \u2014 either God isn't fully good, isn't fully powerful, or doesn't exist at all.",
+      response: "Scripture doesn't dodge this; Job, Habakkuk, and the Psalms are full of people demanding an answer. Three threads worth having ready: (1) love that means anything requires real freedom, and freedom that can be misused is what makes evil possible without making God its author. (2) Most suffering traces to a world genuinely broken by that freedom, not to God's design \u2014 and Scripture promises it's being put right, not ignored. (3) The cross is the specific Christian answer to whether God cares \u2014 a God who suffers with and for us, not from a safe distance. None of this makes suffering feel small; it's meant to show it isn't the last word.",
+      refs: [ { book: "Job", chapter: 38, verseStart: 1, verseEnd: 7 }, { book: "Romans", chapter: 8, verseStart: 18, verseEnd: 28 },
+        { book: "Isaiah", chapter: 53, verseStart: 3, verseEnd: 5 }, { book: "Revelation", chapter: 21, verseStart: 3, verseEnd: 4 } ] },
+    { id: "contradictions", title: "Doesn't the Bible contradict itself?",
+      objection: "Different Gospel accounts give different details for the same events \u2014 who was at the tomb, what was said on the cross, the order of the temptation narrative. If it's God's inspired word, shouldn't it line up perfectly?",
+      response: "Worth separating two claims: a genuine contradiction (A and not-A, same time, same sense) versus differing selection and vantage point, which is how independent honest witnesses normally sound \u2014 courts treat verbatim-identical testimony as a red flag, not a virtue. Many of the most-cited \u201ccontradictions\u201d resolve once you allow for compressed timelines, partial quotation, or two similar-but-distinct events. A few take real work to reconcile, and it's fair to admit that rather than paper over it. This is also where \u201cundesigned coincidences\u201d earn their keep: incidental details that only click together across two accounts showing no sign of copying each other \u2014 harder to explain as fabrication than as independent, honest reporting.",
+      refs: [ { book: "Luke", chapter: 1, verseStart: 1, verseEnd: 4 }, { book: "John", chapter: 19, verseStart: 35, verseEnd: 35 },
+        { book: "2 Peter", chapter: 1, verseStart: 16, verseEnd: 16 } ] },
+    { id: "reliability", title: "How do we know the Gospels are historically reliable?",
+      objection: "The Gospels were written decades after Jesus lived, by anonymous or biased authors, and copied by hand for centuries before printing. How can we trust the text we have today reflects what was actually written, let alone what actually happened?",
+      response: "Two questions get conflated here: transmission (do we have what was originally written?) and history (was what was written accurate?). On transmission, the New Testament has more and earlier manuscript evidence than any other ancient text by a wide margin, and the variants that exist are overwhelmingly spelling and word-order, not doctrine-changing. On history, the Gospels were written within living memory of eyewitnesses \u2014 unusually close for ancient biography \u2014 include specific, checkable details later confirmed archaeologically, and include awkward details (the disciples' cowardice, women as first witnesses despite low legal standing for female testimony at the time) that a later, polished fabrication would likely have smoothed over.",
+      refs: [ { book: "Luke", chapter: 1, verseStart: 1, verseEnd: 4 }, { book: "1 Corinthians", chapter: 15, verseStart: 3, verseEnd: 8 },
+        { book: "John", chapter: 20, verseStart: 30, verseEnd: 31 } ] },
+    { id: "ot-violence", title: "Isn't the Old Testament God violent and immoral?",
+      objection: "The conquest narratives, commands tied to warfare, and harsh penalties in the Law read as brutal by modern standards. How is this the same God Christians call loving?",
+      response: "Worth taking the hardest texts head-on rather than softening them. A few honest angles: the conquest narratives sit inside a specific, bounded historical judgment described in the text itself as reaching a point of no return \u2014 not a timeless template, and nothing in the New Testament repeats or endorses it going forward. The Law's harsher penalties are frequently the ceiling of a punishment rather than the command to inflict it, and consistently more restrained than the surrounding Ancient Near Eastern law codes. And the trajectory across Scripture bends toward Jesus explicitly reinterpreting \u201ceye for an eye\u201d and enemy-love \u2014 which Christians read as the fuller revelation the earlier text was always heading toward, not a contradiction of it.",
+      refs: [ { book: "Genesis", chapter: 15, verseStart: 16, verseEnd: 16 }, { book: "Matthew", chapter: 5, verseStart: 38, verseEnd: 45 },
+        { book: "Micah", chapter: 6, verseStart: 8, verseEnd: 8 } ] },
+    { id: "hell", title: "Why would a loving God send people to hell?",
+      objection: "Eternal consequences for a finite life's choices seem disproportionate, and exclusive claims \u2014 no one comes to the Father except through the Son \u2014 feel harsh toward the many who never hear the message in a form they could fairly weigh.",
+      response: "Two things worth separating: God's justice toward genuine wrong, and the specific claim that the door is narrower than seems fair. On the first, most people, pressed, want some wrongs to matter eternally (unrepented atrocities, say) \u2014 the discomfort is usually with scope, not the principle. On exclusivity, it's worth noting Jesus is at least as concerned about this as the objector \u2014 there's real room in Scripture for how God judges those who never heard; the claim isn't that sincerity doesn't matter, it's that reconciliation runs through what Christ did, however someone's story arrives there. This is genuinely one of the harder doctrines to sit with, and honest apologetics doesn't pretend otherwise.",
+      refs: [ { book: "Romans", chapter: 2, verseStart: 12, verseEnd: 16 }, { book: "John", chapter: 14, verseStart: 6, verseEnd: 6 },
+        { book: "2 Peter", chapter: 3, verseStart: 9, verseEnd: 9 } ] },
+    { id: "science", title: "Hasn't science disproven the Bible / a Creator?",
+      objection: "Evolution explains the diversity of life without a designer, the universe is billions rather than thousands of years old, and every gap once attributed to God has eventually been explained naturally. Isn't \u201cGod\u201d just what we call the parts of the map we haven't filled in yet?",
+      response: "Worth separating what science can and can't adjudicate. Science is very good at explaining mechanism \u2014 how things unfold once they exist, following laws \u2014 and much weaker on origin questions: why there are laws at all, why anything exists, why the universe's constants are fine-tuned for complex life. That's the territory fine-tuning and cosmological arguments actually work in, not gap-filling. On the age of the universe and evolution specifically: a large share of Christians hold these as compatible with Genesis read as theological rather than a modern science text \u2014 so for most believers this isn't really a Bible-vs-science fight, it's a live, respectful, in-house conversation about how to read Genesis 1, worth knowing going in.",
+      refs: [ { book: "Psalms", chapter: 19, verseStart: 1, verseEnd: 4 }, { book: "Romans", chapter: 1, verseStart: 19, verseEnd: 20 },
+        { book: "Genesis", chapter: 1, verseStart: 1, verseEnd: 1 } ] },
+  ];
+
+  function renderApologeticsList() {
+    const wrap = $("#apologeticsList");
+    if (!wrap) return;
+    wrap.innerHTML = APOLOGETICS.map((a) => `
+      <div class="trcard">
+        <div class="trcard-name" style="cursor:pointer" data-toggle="${a.id}">${escapeHtml(a.title)}</div>
+        <div id="apo-body-${a.id}" style="display:none;margin-top:10px">
+          <div class="hint" style="margin-bottom:8px"><strong>The objection:</strong> ${escapeHtml(a.objection)}</div>
+          <div style="font-size:14.5px;line-height:1.6;margin-bottom:10px">${escapeHtml(a.response)}</div>
+          <button class="dl" data-tabify="${a.id}" style="width:100%">Save as a tab</button>
+        </div>
+      </div>`).join("");
+    wrap.querySelectorAll("[data-toggle]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const body = $("#apo-body-" + el.dataset.toggle);
+        body.style.display = body.style.display === "none" ? "block" : "none";
+      });
+    });
+    wrap.querySelectorAll("[data-tabify]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const a = APOLOGETICS.find((x) => x.id === btn.dataset.tabify);
+        const tabs = loadTabs();
+        const newTab = { id: "t_" + Date.now(), label: a.title, translationId: state.readTr, refs: a.refs.slice() };
+        tabs.push(newTab);
+        saveTabs(tabs);
+        renderTabStrip();
+        broadcastTabAdd(newTab);
+        toast("Saved as tab");
+      });
+    });
+  }
+
+  /* =====================================================================
+     Study sessions — PeerJS mesh networking
+     See the architecture comment at the top of this file for the design.
+  ===================================================================== */
+  const ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L — easy to read aloud
+  function makeRoomCode() {
+    let s = "";
+    for (let i = 0; i < 6; i++) s += ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)];
+    return s;
+  }
+  function hostPeerId(code) { return `berea-${code.toLowerCase()}-host`; }
+
+  const mesh = {
+    active: false,
+    roomCode: null,
+    peer: null,
+    myId: null,
+    myName: null,
+    isHost: false,
+    leaderId: null,
+    isLeader: false,
+    following: true,
+    connections: new Map(),  // peerId -> DataConnection
+    roster: new Map(),       // peerId -> { name }
+  };
+
+  function getMyName() {
+    let name = localStorage.getItem("berea.name");
+    if (!name) {
+      name = (prompt("What name should the study group see?", "") || "").trim() || "Guest";
+      localStorage.setItem("berea.name", name);
+    }
+    return name;
+  }
+
+  function meshBroadcast(msg, exceptId) {
+    mesh.connections.forEach((conn, id) => {
+      if (id === exceptId) return;
+      try { if (conn.open) conn.send(msg); } catch (e) { /* connection likely closing; ignore */ }
+    });
+  }
+
+  function meshAddConnection(conn) {
+    mesh.connections.set(conn.peer, conn);
+    conn.on("data", (msg) => handleMeshMessage(conn, msg));
+    conn.on("close", () => meshRemoveConnection(conn.peer));
+    conn.on("error", () => meshRemoveConnection(conn.peer));
+    renderStudyView();
+  }
+
+  function meshRemoveConnection(id) {
+    if (!mesh.connections.has(id)) return;
+    mesh.connections.delete(id);
+    mesh.roster.delete(id);
+    renderStudyView();
+    if (mesh.active && !mesh.isHost && id === hostPeerId(mesh.roomCode)) {
+      maybeReclaimHost();
+    }
+  }
+
+  function connectToPeer(id, name) {
+    if (!mesh.peer || id === mesh.myId || mesh.connections.has(id)) return;
+    // Both sides typically learn about each other around the same time (via
+    // roster/presence messages); only the lexicographically-lower id opens
+    // the connection so we don't end up with two duplicate channels racing.
+    if (mesh.myId > id) return;
+    const conn = mesh.peer.connect(id);
+    conn.on("open", () => {
+      meshAddConnection(conn);
+      conn.send({ t: "hello", id: mesh.myId, name: mesh.myName });
+    });
+    conn.on("error", () => {});
+  }
+
+  function handleMeshMessage(conn, msg) {
+    if (!msg || !msg.t) return;
+    switch (msg.t) {
+      case "hello": {
+        mesh.roster.set(msg.id, { name: msg.name });
+        const peers = Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name }))
+          .concat([{ id: mesh.myId, name: mesh.myName }]);
+        conn.send({ t: "roster", peers, leaderId: mesh.leaderId });
+        meshBroadcast({ t: "presence", id: msg.id, name: msg.name }, msg.id);
+        renderStudyView();
+        break;
+      }
+      case "roster":
+        msg.peers.forEach((p) => {
+          if (p.id === mesh.myId) return;
+          mesh.roster.set(p.id, { name: p.name });
+          connectToPeer(p.id, p.name);
+        });
+        if (msg.leaderId) {
+          mesh.leaderId = msg.leaderId;
+          mesh.isLeader = msg.leaderId === mesh.myId;
+        }
+        renderStudyView();
+        break;
+      case "presence":
+        mesh.roster.set(msg.id, { name: msg.name });
+        connectToPeer(msg.id, msg.name);
+        renderStudyView();
+        break;
+      case "nav":
+        if (!mesh.isLeader && mesh.following) {
+          const book = bookByName(msg.book);
+          if (book) {
+            state.book = book; state.chapter = msg.chapter; state.verseFocus = null;
+            setView("read");
+          }
+        }
+        break;
+      case "lead-claim": {
+        mesh.leaderId = msg.id;
+        mesh.isLeader = msg.id === mesh.myId;
+        renderStudyView();
+        const who = msg.id === mesh.myId ? "You are" : ((mesh.roster.get(msg.id) || {}).name || "Someone") + " is";
+        toast(who + " leading now");
+        break;
+      }
+      case "tab-add": {
+        const tabs = loadTabs();
+        if (!tabs.find((t) => t.id === msg.tab.id)) {
+          tabs.push(msg.tab);
+          saveTabs(tabs);
+          renderTabStrip();
+        }
+        break;
+      }
+      case "tab-update": {
+        const tabs = loadTabs();
+        const t = tabs.find((x) => x.id === msg.tabId);
+        if (t) {
+          t.refs = msg.refs;
+          saveTabs(tabs);
+          if (state.activeTabId === msg.tabId) openTab(msg.tabId);
+        }
+        break;
+      }
+    }
+  }
+
+  function maybeReclaimHost() {
+    // Only the lexicographically-lowest surviving peer id attempts this,
+    // so we don't get a stampede of simultaneous claims.
+    const ids = Array.from(mesh.roster.keys()).concat([mesh.myId]).sort();
+    if (ids[0] !== mesh.myId) return;
+    setTimeout(() => {
+      if (mesh.isHost || !mesh.active || typeof Peer === "undefined") return;
+      const oldPeer = mesh.peer;
+      const knownPeers = Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name }));
+      const newPeer = new Peer(hostPeerId(mesh.roomCode));
+      newPeer.on("open", (id) => {
+        mesh.peer = newPeer; mesh.myId = id; mesh.isHost = true;
+        wirePeerEvents();
+        if (oldPeer) oldPeer.destroy();
+        mesh.connections.clear();
+        knownPeers.forEach((p) => connectToPeer(p.id, p.name));
+        renderStudyView();
+        toast("You're now hosting the study");
+      });
+      newPeer.on("error", () => { newPeer.destroy(); }); // someone else already claimed it — fine
+    }, 700 + Math.random() * 900);
+  }
+
+  function initPeer(id) {
+    return new Promise((resolve, reject) => {
+      const p = new Peer(id);
+      let settled = false;
+      p.on("open", (realId) => { if (!settled) { settled = true; resolve({ peer: p, id: realId }); } });
+      p.on("error", (err) => { if (!settled) { settled = true; reject(err); } });
+    });
+  }
+
+  function wirePeerEvents() {
+    mesh.peer.on("connection", (conn) => { conn.on("open", () => meshAddConnection(conn)); });
+    mesh.peer.on("disconnected", () => {
+      setTimeout(() => { if (mesh.active && mesh.peer && mesh.peer.disconnected) mesh.peer.reconnect(); }, 2000);
+    });
+    mesh.peer.on("close", () => { mesh.active = false; renderStudyView(); });
+    mesh.peer.on("error", (err) => console.warn("Study session peer error:", err));
+  }
+
+  async function startStudy() {
+    if (typeof Peer === "undefined") { toast("Study sessions need an internet connection."); return; }
+    const name = getMyName();
+    const code = makeRoomCode();
+    mesh.roomCode = code; mesh.myName = name;
+    try {
+      const { peer, id } = await initPeer(hostPeerId(code));
+      mesh.peer = peer; mesh.myId = id; mesh.isHost = true; mesh.active = true;
+      mesh.leaderId = id; mesh.isLeader = true; mesh.following = true;
+      wirePeerEvents();
+      location.hash = "study=" + code;
+      renderStudyView();
+      toast("Study started");
+    } catch (e) {
+      toast("Couldn't start a study session — check your connection and try again.");
+    }
+  }
+
+  async function joinStudy(codeRaw) {
+    if (typeof Peer === "undefined") { toast("Study sessions need an internet connection."); return; }
+    const code = (codeRaw || "").trim().toUpperCase();
+    if (code.length < 4) { toast("Enter the study's 6-letter code."); return; }
+    const name = getMyName();
+    mesh.roomCode = code; mesh.myName = name;
+    try {
+      const { peer, id } = await initPeer(undefined);
+      mesh.peer = peer; mesh.myId = id; mesh.isHost = false; mesh.active = true; mesh.following = true;
+      wirePeerEvents();
+      const hostId = hostPeerId(code);
+      mesh.leaderId = hostId; // provisional, refined once a roster reply arrives
+      const conn = peer.connect(hostId);
+      let responded = false;
+      conn.on("open", () => {
+        responded = true;
+        meshAddConnection(conn);
+        conn.send({ t: "hello", id: mesh.myId, name: mesh.myName });
+      });
+      conn.on("error", () => { if (!responded) toast("Couldn't find that study — check the code and try again."); });
+      location.hash = "study=" + code;
+      renderStudyView();
+    } catch (e) {
+      toast("Couldn't join the study — check your connection and try again.");
+    }
+  }
+
+  function leaveStudy() {
+    mesh.connections.forEach((conn) => { try { conn.close(); } catch (e) {} });
+    if (mesh.peer) { try { mesh.peer.destroy(); } catch (e) {} }
+    mesh.active = false; mesh.roomCode = null; mesh.peer = null;
+    mesh.connections.clear(); mesh.roster.clear();
+    mesh.leaderId = null; mesh.isLeader = false; mesh.isHost = false;
+    history.replaceState(null, "", location.pathname + location.search);
+    renderStudyView();
+  }
+
+  function takeLead() {
+    mesh.leaderId = mesh.myId;
+    mesh.isLeader = true;
+    meshBroadcast({ t: "lead-claim", id: mesh.myId, name: mesh.myName });
+    renderStudyView();
+  }
+
+  function broadcastNavIfLeader() {
+    if (!mesh.active || !mesh.isLeader) return;
+    meshBroadcast({ t: "nav", book: state.book.name, chapter: state.chapter });
+  }
+  function broadcastTabAdd(tabObj) { if (mesh.active) meshBroadcast({ t: "tab-add", tab: tabObj }); }
+  function broadcastTabUpdate(tabId, refs) { if (mesh.active) meshBroadcast({ t: "tab-update", tabId, refs }); }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !mesh.active || !mesh.peer) return;
+    if (mesh.peer.disconnected) mesh.peer.reconnect();
+    mesh.roster.forEach((info, id) => { if (!mesh.connections.has(id)) connectToPeer(id, info.name); });
+  });
+
+  function renderStudyView() {
+    const wrap = $("#studyBody");
+    if (!wrap) return;
+    if (!mesh.active) {
+      wrap.innerHTML = `
+        <div class="hint">Start a study to read together in real time. Everyone stays in sync as the leader moves through a passage, and the group keeps going even if whoever started it drops off.</div>
+        <button class="dl" id="startStudyBtn" style="width:100%;margin-bottom:18px">Start a Study</button>
+        <div class="testament-label">Have a code?</div>
+        <div style="display:flex;gap:8px">
+          <input id="joinCodeInput" class="code-input" type="text" placeholder="6-letter code" maxlength="6">
+          <button class="dl" id="joinStudyBtn">Join</button>
+        </div>`;
+      $("#startStudyBtn").addEventListener("click", startStudy);
+      $("#joinStudyBtn").addEventListener("click", () => joinStudy($("#joinCodeInput").value));
+      $("#joinCodeInput").addEventListener("keydown", (ev) => { if (ev.key === "Enter") joinStudy(ev.target.value); });
+      return;
+    }
+    const shareUrl = location.origin + location.pathname + "#study=" + mesh.roomCode;
+    const rosterList = [{ id: mesh.myId, name: mesh.myName + " (you)" }]
+      .concat(Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name })));
+    wrap.innerHTML = `
+      <div class="hint"><strong>Room code: ${mesh.roomCode}</strong><br>Share this link in your messaging app — anyone who opens it joins instantly.</div>
+      <div style="display:flex;gap:8px;margin-bottom:18px">
+        <button class="dl" id="copyLinkBtn" style="flex:1">Copy link</button>
+        ${navigator.share ? '<button class="dl" id="shareLinkBtn" style="flex:1">Share…</button>' : ""}
+      </div>
+      <div class="testament-label">In this study (${rosterList.length})</div>
+      <div style="margin-bottom:16px">${rosterList.map((p) => `<div class="roster-row">
+        <span>${escapeHtml(p.name)}</span>${mesh.leaderId === p.id ? '<span class="roster-tag">LEADING</span>' : ""}
+      </div>`).join("")}</div>
+      ${mesh.isLeader
+        ? `<div class="hint">You're leading — your navigation moves everyone who's following along.</div>`
+        : `<button class="dl" id="takeLeadBtn" style="width:100%;margin-bottom:10px">Take the lead</button>
+           <label class="follow-row"><input type="checkbox" id="followToggle" ${mesh.following ? "checked" : ""}> Follow along automatically</label>`}
+      <button class="leave-btn" id="leaveStudyBtn">Leave study</button>
+    `;
+    $("#copyLinkBtn").addEventListener("click", () => {
+      if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied"));
+    });
+    $("#shareLinkBtn")?.addEventListener("click", () => {
+      navigator.share({ title: "Join our Bible study", url: shareUrl }).catch(() => {});
+    });
+    $("#takeLeadBtn")?.addEventListener("click", takeLead);
+    $("#followToggle")?.addEventListener("change", (ev) => { mesh.following = ev.target.checked; });
+    $("#leaveStudyBtn").addEventListener("click", () => { if (confirm("Leave this study?")) leaveStudy(); });
+  }
+
+  /* =====================================================================
+     Wiring
+  ===================================================================== */
+  $("#refBtn").addEventListener("click", openPicker);
+  $("#pickerClose").addEventListener("click", closePicker);
+  $("#pickerBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "pickerBackdrop") closePicker(); });
+  $("#verseSheetBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "verseSheetBackdrop") closeVerseSheet(); });
+
+  $("#aiProvider").addEventListener("change", (ev) => {
+    $("#aiBaseUrlInput").style.display = ev.target.value === "custom" ? "block" : "none";
+  });
+  $("#aiSaveConfig").addEventListener("click", () => {
+    const key = $("#aiKeyInput").value.trim();
+    if (!key) { toast("Enter an API key."); return; }
+    saveAiConfig({ provider: $("#aiProvider").value, key,
+      model: $("#aiModelInput").value.trim(), baseUrl: $("#aiBaseUrlInput").value.trim() });
+    closeAiConfigSheet();
+    toast("AI settings saved");
+    const cb = aiConfigSavedCallback; aiConfigSavedCallback = null;
+    if (cb) cb();
+  });
+  $("#aiCancelConfig").addEventListener("click", () => { aiConfigSavedCallback = null; closeAiConfigSheet(); });
+  $("#aiConfigBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "aiConfigBackdrop") { aiConfigSavedCallback = null; closeAiConfigSheet(); } });
+
+  $("#aiCreateTab").addEventListener("click", () => {
+    const checked = $$("#aiSuggestList input[type=checkbox]:checked").map((el) => currentAiSuggestions[parseInt(el.dataset.i, 10)]);
+    if (!checked.length) { toast("Select at least one suggestion."); return; }
+    const seed = currentAiSeed;
+    const suggested = seed ? refLabel(seed.book, seed.chapter, seed.verseStart, seed.verseEnd) + " \u2014 cross-refs" : "AI cross-references";
+    const label = prompt("Label for this tab?", suggested);
+    if (!label) return;
+    const refs = [];
+    if (seed) refs.push({ book: seed.book, chapter: seed.chapter, verseStart: seed.verseStart, verseEnd: seed.verseEnd });
+    checked.forEach((s) => refs.push({ book: s.book, chapter: s.chapter, verseStart: s.verseStart, verseEnd: s.verseEnd }));
+    const tabs = loadTabs();
+    const newTab = { id: "t_" + Date.now(), label, translationId: state.readTr, refs };
+    tabs.push(newTab);
+    saveTabs(tabs);
+    renderTabStrip();
+    broadcastTabAdd(newTab);
+    $("#aiSuggestBackdrop").classList.remove("show");
+    toast("Tab created");
+  });
+  $("#aiSuggestClose").addEventListener("click", () => $("#aiSuggestBackdrop").classList.remove("show"));
+  $("#aiSuggestBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "aiSuggestBackdrop") $("#aiSuggestBackdrop").classList.remove("show"); });
+
+  $("#trBadge").innerHTML = TR_ORDER.map((t) => `<option value="${t}">${t}</option>`).join("");
+  $("#trBadge").addEventListener("change", (ev) => {
+    state.readTr = ev.target.value;
+    renderRead();
+  });
+
+  $$("#bottomnav button").forEach((btn) => {
+    btn.addEventListener("click", () => setView(btn.dataset.view));
+  });
+
+  $("#searchForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    runSearch($("#searchTr").value, $("#searchInput").value);
+  });
+  $("#tabSearchForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    runTabSearch($("#tabSearchInput").value);
+  });
+  $("#tabSearchInput").addEventListener("input", () => runTabSearch($("#tabSearchInput").value));
+  $$("#searchModeToggle button").forEach((btn) => {
+    btn.addEventListener("click", () => setSearchMode(btn.dataset.mode));
+  });
+
+  /* =====================================================================
+     Boot
+  ===================================================================== */
+  async function boot() {
+    try { await openDB(); }
+    catch (e) { toast("This browser doesn't support offline storage — reading will still work online."); }
+    seedDefaultTabsIfEmpty();
+    renderTabStrip();
+    setView("read");
+    const m = location.hash.match(/study=([A-Za-z0-9]+)/);
+    if (m) {
+      setView("study");
+      setTimeout(() => joinStudy(m[1]), 250);
+    }
+  }
+  boot();
+
+})();
+</script>
+</body>
+</html>
