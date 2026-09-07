@@ -217,6 +217,33 @@
     vertical-align: super;
     margin-right: 2px;
   }
+  .read-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px;
+  }
+  .read-head h1 { margin: 0; }
+  .strongs-toggle {
+    flex: 0 0 auto; font-family: var(--font-ui); font-size: 12px; font-weight: 600;
+    padding: 6px 11px; border-radius: 999px; border: 1px solid var(--gilt-soft);
+    background: var(--panel); color: var(--ink-soft);
+  }
+  .strongs-toggle.on { background: var(--cover); color: var(--cover-text); border-color: var(--cover); }
+  .sword {
+    border-bottom: 1px dotted var(--gilt);
+    cursor: pointer;
+  }
+  .sword:active { background: var(--gilt-soft); }
+  .topic-ref {
+    display: inline-block; font-family: var(--font-ui); font-size: 12.5px;
+    padding: 5px 10px; margin: 0 5px 5px 0; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--cover);
+  }
+  .topic-ref:active { background: var(--gilt-soft); }
+  .notemark {
+    font-size: 10px;
+    color: var(--cover);
+    vertical-align: super;
+    margin-left: 2px;
+  }
   .hl-yellow { background: var(--hl-yellow); }
   .hl-green  { background: var(--hl-green); }
   .hl-blue   { background: var(--hl-blue); }
@@ -517,6 +544,12 @@
   .sheet-actions button.primary { background: var(--cover); color: var(--cover-text); border: none; }
   .sheet-actions button.ghost { background: none; border: none; color: var(--ink-soft); }
   .sheet.wide-sheet { max-height: 78vh; overflow-y: auto; }
+  .ai-textarea {
+    width: 100%; height: 100px; font-family: var(--font-ui); font-size: 12.5px; line-height: 1.4;
+    padding: 10px; border: 1px solid var(--line); border-radius: 9px;
+    background: var(--page-dim); color: var(--ink); resize: vertical; box-sizing: border-box;
+  }
+  #aiPasteInput { background: var(--panel); font-size: 13px; }
   .ai-suggestion {
     border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
     display: flex; gap: 10px; align-items: flex-start;
@@ -583,7 +616,10 @@
   <div id="content">
 
     <section id="view-read" class="view active">
-      <h1 id="readChapterTitle"></h1>
+      <div class="read-head">
+        <h1 id="readChapterTitle"></h1>
+        <button id="strongsModeBtn" type="button" class="strongs-toggle">Strong's</button>
+      </div>
       <div id="readBody" class="verseflow"></div>
     </section>
 
@@ -596,6 +632,7 @@
       <div class="seg-toggle" id="searchModeToggle">
         <button data-mode="verses" class="active" type="button">Verses</button>
         <button data-mode="tabs" type="button">Tabs</button>
+        <button data-mode="topics" type="button">Topics</button>
       </div>
       <form id="searchForm">
         <select id="searchTr"></select>
@@ -604,6 +641,9 @@
       </form>
       <form id="tabSearchForm" style="display:none">
         <input id="tabSearchInput" type="text" placeholder="Search your tabs by name or reference…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+      </form>
+      <form id="topicSearchForm" style="display:none">
+        <input id="topicSearchInput" type="text" placeholder="Search topics — faith, forgiveness, prayer…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
       </form>
       <div id="searchResults"></div>
     </section>
@@ -619,8 +659,32 @@
       <div id="trcards"></div>
 
       <div class="testament-label" style="margin-top:22px">Cross-references (AI-assisted)</div>
-      <div class="hint">Ask an AI you configure with your own API key to suggest cross-references, thematic parallels, and undesigned coincidences for a passage — then turn what looks useful into a tab.</div>
+      <div class="hint">Get a ready-made prompt for any AI chat you already use — ChatGPT, Claude, Gemini, whatever. Copy it in, paste the reply back, and turn what looks useful into a tab. No account or API key required.</div>
       <div id="aiPanel"></div>
+
+      <div class="testament-label" style="margin-top:22px">Hebrew &amp; Greek (Strong's Concordance)</div>
+      <div class="hint">Look up the original-language word behind a KJV term — free, one-time downloads (Strong's Dictionaries of Hebrew and Greek, public domain).</div>
+      <div id="strongsCards"></div>
+      <div class="testament-label" style="margin-top:14px">Tap-a-word text</div>
+      <div class="hint">Download a Strong's-tagged Bible to tap any word while reading and see the Hebrew or Greek behind it. Then use the "Strong's" button at the top of the Read view. One large download each — best on Wi-Fi.</div>
+      <div id="taggedCards"></div>
+      <form id="strongsSearchForm" style="display:flex;gap:8px;margin-top:10px">
+        <input id="strongsSearchInput" type="text" placeholder="Search a word, transliteration, or number (e.g. agape, H7225)…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+        <button class="dl" type="submit">Go</button>
+      </form>
+      <div id="strongsResults"></div>
+
+      <div class="testament-label" style="margin-top:22px">Traditional cross-references (Treasury of Scripture Knowledge)</div>
+      <div class="hint">The classic, non-AI cross-reference set scholars have used for over a century — reachable per-verse from the verse menu once downloaded. It's a large one-time download (several hundred thousand entries), best on Wi-Fi.</div>
+      <div id="xrefCards"></div>
+
+      <div class="testament-label" style="margin-top:22px">Topical study (Nave's Topical Bible)</div>
+      <div class="hint">Study by subject instead of by passage — over 5,000 headings, each with the verses that speak to it. Search them under Search › Topics once downloaded.</div>
+      <div id="navesCards"></div>
+
+      <div class="testament-label" style="margin-top:22px">Backup &amp; restore</div>
+      <div class="hint">Your tabs, highlights, and notes live only in this browser — clearing site data or switching devices loses them. Save a backup file to keep them safe or move them somewhere else. Downloaded scripture text isn't included (it's re-downloadable).</div>
+      <div id="backupPanel"></div>
 
       <div class="testament-label" style="margin-top:22px">Apologetics practice</div>
       <div class="hint">Common objections, framed fairly, with a response outline and the passages to back it up. Good for rehearsing before a real conversation.</div>
@@ -658,10 +722,12 @@
 
 <!-- Verse action sheet -->
 <div id="verseSheetBackdrop" class="sheet-backdrop">
-  <div class="sheet">
+  <div class="sheet wide-sheet">
     <div class="sheet-ref" id="vsRef"></div>
     <div class="sheet-text" id="vsText"></div>
     <div class="swatches" id="vsSwatches"></div>
+    <textarea id="vsNoteInput" class="ai-textarea" style="height:76px" placeholder="Your note on this verse…"></textarea>
+    <div id="vsNoteStatus" style="font-family:var(--font-ui);font-size:11.5px;color:var(--ink-faint);margin:4px 0 12px;min-height:14px"></div>
     <div class="sheet-actions" id="vsActions"></div>
   </div>
 </div>
@@ -690,11 +756,56 @@
 <div id="aiSuggestBackdrop" class="sheet-backdrop">
   <div class="sheet wide-sheet">
     <div class="sheet-ref" id="aiSuggestRef"></div>
-    <div class="sheet-text" id="aiSuggestStatus">Asking…</div>
+    <div class="sheet-text">1. Copy this prompt. 2. Paste it into any AI chat you already use (ChatGPT, Claude, Gemini…). 3. Paste its reply back below.</div>
+    <textarea id="aiPromptText" class="ai-textarea" readonly></textarea>
+    <button class="dl" id="aiCopyPromptBtn" style="width:100%;margin:8px 0 16px">Copy prompt</button>
+
+    <div class="sheet-text" style="margin-bottom:6px">Paste the AI's reply here:</div>
+    <textarea id="aiPasteInput" class="ai-textarea" placeholder="Paste the JSON response…"></textarea>
+    <button class="dl" id="aiImportBtn" style="width:100%;margin:8px 0 16px">Import suggestions</button>
+
+    <div class="sheet-text" id="aiSuggestStatus"></div>
     <div id="aiSuggestList"></div>
     <div class="sheet-actions">
       <button class="primary" id="aiCreateTab">Add selected as a tab</button>
+      <button class="ghost" id="aiUseDirectBtn">Or connect an API directly instead</button>
       <button class="ghost" id="aiSuggestClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Traditional (TSK) cross-references for a single verse -->
+<div id="xrefSheetBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref" id="xrefSheetRef"></div>
+    <div class="sheet-text" id="xrefSheetStatus"></div>
+    <div id="xrefSheetList"></div>
+    <div class="sheet-actions">
+      <button class="ghost" id="xrefSheetClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Strong's dictionary entry -->
+<div id="strongsEntryBackdrop" class="sheet-backdrop">
+  <div class="sheet">
+    <div class="sheet-ref" id="strongsEntryKey"></div>
+    <div id="strongsEntryBody" style="font-size:14.5px;line-height:1.6;margin-bottom:14px"></div>
+    <div class="sheet-actions">
+      <button class="ghost" id="strongsEntryClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nave's topic detail -->
+<div id="topicSheetBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref" id="topicSheetName"></div>
+    <div class="sheet-text" id="topicSheetStatus"></div>
+    <div id="topicSheetList"></div>
+    <div class="sheet-actions">
+      <button class="primary" id="topicSaveTab">Save topic as a tab</button>
+      <button class="ghost" id="topicSheetClose">Close</button>
     </div>
   </div>
 </div>
@@ -894,7 +1005,7 @@
      IndexedDB layer
   ===================================================================== */
   const DB_NAME = "berea";
-  const DB_VERSION = 1;
+  const DB_VERSION = 5;
   let _dbPromise = null;
 
   function openDB() {
@@ -913,6 +1024,24 @@
         }
         if (!db.objectStoreNames.contains("highlights")) {
           db.createObjectStore("highlights", { keyPath: "ref" });
+        }
+        if (!db.objectStoreNames.contains("strongs")) {
+          db.createObjectStore("strongs", { keyPath: "key" });
+        }
+        if (!db.objectStoreNames.contains("xrefs")) {
+          const xstore = db.createObjectStore("xrefs", { keyPath: "id", autoIncrement: true });
+          xstore.createIndex("byFrom", "fromKey", { unique: false });
+        }
+        if (!db.objectStoreNames.contains("notes")) {
+          db.createObjectStore("notes", { keyPath: "ref" });
+        }
+        if (!db.objectStoreNames.contains("topics")) {
+          // Nave's Topical: one record per topic heading.
+          db.createObjectStore("topics", { keyPath: "key" });
+        }
+        if (!db.objectStoreNames.contains("tagged")) {
+          // Strong's-tagged verse tokens, keyed book|chapter|verse.
+          db.createObjectStore("tagged", { keyPath: "ref" });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -987,6 +1116,40 @@
     return map;
   }
 
+  /* ---- notes (same ref keying as highlights: book|chapter|verse) ---- */
+  async function getNote(ref) {
+    const db = await openDB();
+    const tx = db.transaction("notes", "readonly");
+    const rec = await idbReq(tx.objectStore("notes").get(ref));
+    return rec ? rec.text : "";
+  }
+  async function setNote(ref, text) {
+    const db = await openDB();
+    const tx = db.transaction("notes", "readwrite");
+    if (text && text.trim()) tx.objectStore("notes").put({ ref, text: text.trim(), updatedAt: Date.now() });
+    else tx.objectStore("notes").delete(ref);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function getAllNotesForChapter(bookName, chapter) {
+    const db = await openDB();
+    const tx = db.transaction("notes", "readonly");
+    const all = await idbReq(tx.objectStore("notes").getAll());
+    const prefix = `${bookName}|${chapter}|`;
+    const map = {};
+    for (const n of all) if (n.ref.startsWith(prefix)) map[n.ref.split("|")[2]] = n.text;
+    return map;
+  }
+  async function getAllNotes() {
+    const db = await openDB();
+    const tx = db.transaction("notes", "readonly");
+    return await idbReq(tx.objectStore("notes").getAll());
+  }
+  async function getAllHighlights() {
+    const db = await openDB();
+    const tx = db.transaction("highlights", "readonly");
+    return await idbReq(tx.objectStore("highlights").getAll());
+  }
+
   /* ---- fetching + progressive caching ---- */
   async function fetchLiveChapter(trId, book, chapter) {
     const src = TRANSLATIONS[trId];
@@ -1031,6 +1194,484 @@
   }
 
   /* =====================================================================
+     Strong's Concordance (Hebrew & Greek dictionaries) and traditional
+     cross-references (Treasury of Scripture Knowledge, via openbible.info)
+     ---------------------------------------------------------------------
+     Both are one-time bulk downloads, same shape as a translation download.
+     Sources: openscriptures/strongs (Strong's Hebrew & Greek dictionaries,
+     public domain) and scrollmapper/bible_databases's cross_references
+     table (compiled by openbible.info, primarily from the Treasury of
+     Scripture Knowledge, public domain). Both are static files on GitHub's
+     CDN, not a live API, so the only real constraint is download size \u2014
+     the cross-reference set especially is several hundred thousand rows.
+     Parsing here is deliberately defensive (multiple field-name fallbacks)
+     since these are hand-verified against documentation, not a live test.
+  ===================================================================== */
+  function normalizeStrongsKey(rawKey) {
+    const m = String(rawKey).match(/^([HG])0*(\d+)$/i);
+    if (!m) return null;
+    return m[1].toUpperCase() + m[2];
+  }
+
+  function extractJsonObject(text) {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start === -1 || end === -1) throw new Error("Unexpected file format");
+    return JSON.parse(text.slice(start, end + 1));
+  }
+
+  async function downloadStrongsDict(lang, onProgress) {
+    const url = lang === "hebrew"
+      ? "https://raw.githubusercontent.com/openscriptures/strongs/master/hebrew/strongs-hebrew-dictionary.js"
+      : "https://raw.githubusercontent.com/openscriptures/strongs/master/greek/strongs-greek-dictionary.js";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const raw = extractJsonObject(text);
+    const entries = Object.entries(raw);
+    if (!entries.length) throw new Error("No dictionary entries found in the downloaded file");
+    const db = await openDB();
+    const BATCH = 1000;
+    for (let i = 0; i < entries.length; i += BATCH) {
+      const chunk = entries.slice(i, i + BATCH);
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("strongs", "readwrite");
+        const store = tx.objectStore("strongs");
+        for (const [key, val] of chunk) {
+          const normKey = normalizeStrongsKey(key);
+          if (!normKey || !val) continue;
+          store.put({
+            key: normKey,
+            lemma: val.lemma || val.word || val.orig || "",
+            xlit: val.xlit || val.translit || val.transliteration || "",
+            pron: val.pron || val.pronunciation || "",
+            derivation: val.derivation || "",
+            def: val.strongs_def || val.definition || val.def || "",
+            kjvDef: val.kjv_def || val.kjvdef || "",
+          });
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+      onProgress(Math.min(i + BATCH, entries.length), entries.length);
+    }
+    await setMeta("strongs-" + lang, { downloaded: true, count: entries.length, downloadedAt: Date.now() });
+  }
+
+  async function getStrongsEntry(rawKey) {
+    const key = normalizeStrongsKey(rawKey) || String(rawKey).toUpperCase();
+    const db = await openDB();
+    const tx = db.transaction("strongs", "readonly");
+    return await idbReq(tx.objectStore("strongs").get(key));
+  }
+
+  let strongsSearchCache = null;
+  async function searchStrongsDict(query) {
+    const db = await openDB();
+    if (!strongsSearchCache) {
+      const tx = db.transaction("strongs", "readonly");
+      strongsSearchCache = await idbReq(tx.objectStore("strongs").getAll());
+    }
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return strongsSearchCache.filter((e) =>
+      e.key.toLowerCase() === q ||
+      (e.lemma || "").toLowerCase().includes(q) ||
+      (e.xlit || "").toLowerCase().includes(q) ||
+      (e.def || "").toLowerCase().includes(q) ||
+      (e.kjvDef || "").toLowerCase().includes(q)
+    ).slice(0, 100);
+  }
+
+  function normalizeBookName(raw) {
+    if (!raw) return null;
+    const s = String(raw).trim();
+    if (bookByName(s)) return s;
+    const low = s.toLowerCase().replace(/\s+/g, " ").trim();
+    for (const [canonical, aliases] of Object.entries(ALIASES)) {
+      if (aliases.includes(low)) return canonical;
+    }
+    const noSpace = low.replace(/\s+/g, "");
+    for (const [canonical, aliases] of Object.entries(ALIASES)) {
+      if (aliases.some((a) => a.replace(/\s+/g, "") === noSpace)) return canonical;
+    }
+    return null;
+  }
+
+  async function downloadCrossReferences(onProgress) {
+    const url = "https://raw.githubusercontent.com/scrollmapper/bible_databases/master/formats/json/cross_references.json";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data
+      : (data.cross_references && Array.isArray(data.cross_references)) ? data.cross_references
+      : (Array.isArray(Object.values(data)[0]) ? Object.values(data)[0] : []);
+    if (!rows.length) throw new Error("No cross-reference rows found in the downloaded file");
+    const db = await openDB();
+    const BATCH = 2000;
+    let kept = 0;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const chunk = rows.slice(i, i + BATCH);
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("xrefs", "readwrite");
+        const store = tx.objectStore("xrefs");
+        for (const r of chunk) {
+          const fromBook = normalizeBookName(r.from_book);
+          const toBook = normalizeBookName(r.to_book);
+          const fromChapter = parseInt(r.from_chapter, 10);
+          const fromVerse = parseInt(r.from_verse, 10);
+          if (!fromBook || !toBook || !fromChapter || !fromVerse) continue;
+          store.put({
+            fromKey: `${fromBook}|${fromChapter}|${fromVerse}`,
+            toBook, toChapter: parseInt(r.to_chapter, 10),
+            toVerseStart: parseInt(r.to_verse_start, 10) || parseInt(r.to_verse, 10) || null,
+            toVerseEnd: parseInt(r.to_verse_end, 10) || parseInt(r.to_verse_start, 10) || parseInt(r.to_verse, 10) || null,
+            votes: parseInt(r.votes, 10) || 0,
+          });
+          kept++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+      onProgress(Math.min(i + BATCH, rows.length), rows.length);
+    }
+    if (!kept) throw new Error("Downloaded the file, but couldn't match any book names \u2014 the source format may have changed");
+    await setMeta("xrefs", { downloaded: true, count: kept, downloadedAt: Date.now() });
+  }
+
+  async function getCrossReferences(bookName, chapter, verse) {
+    const db = await openDB();
+    const tx = db.transaction("xrefs", "readonly");
+    const idx = tx.objectStore("xrefs").index("byFrom");
+    const rows = await idbReq(idx.getAll(IDBKeyRange.only(`${bookName}|${chapter}|${verse}`)));
+    rows.sort((a, b) => b.votes - a.votes);
+    return rows;
+  }
+
+  /* =====================================================================
+     Strong's-tagged text (tap a word to see its Hebrew/Greek)
+     ---------------------------------------------------------------------
+     Source: bolls.life's whole-translation JSON download. Their docs
+     explicitly prefer a single bulk download over per-chapter fetching
+     ("download the translation in JSON... use and abuse it"), which suits
+     our download-once model. We only use KJV and ASV from there, both
+     public domain — the tagged KJV's Strong's data traces back to the
+     Bible Foundation (OT) and CrossWire's KJV2003 project (NT).
+
+     The tag markup convention could not be verified before shipping, so
+     parseStrongsTags auto-detects between the two formats tagged KJV texts
+     actually use, and degrades to plain readable prose if it finds neither.
+     detectStrongsFormat's result is surfaced in the Library card so a
+     mismatch is visible rather than silent.
+  ===================================================================== */
+  const BOLLS_TAGGED = {
+    KJV: { id: "KJV", label: "KJV with Strong's", url: "https://bolls.life/static/translations/KJV.json" },
+    ASV: { id: "ASV", label: "ASV with Strong's", url: "https://bolls.life/static/translations/ASV.json" },
+  };
+
+  function normalizeStrongsNumber(raw, testament) {
+    const s = String(raw).trim();
+    const m = s.match(/^([HG])?0*(\d+)$/i);
+    if (!m) return null;
+    const prefix = m[1] ? m[1].toUpperCase() : (testament === "NT" ? "G" : "H");
+    return prefix + m[2];
+  }
+  function stripTags(s) { return String(s).replace(/<[^>]*>/g, ""); }
+
+  function detectStrongsFormat(text) {
+    if (/<w\s[^>]*lemma\s*=/i.test(text)) return "osis";
+    if (/<S>\s*\d+\s*<\/S>/i.test(text)) return "bolls";
+    return "none";
+  }
+
+  function parseStrongsTags(rawText, testament) {
+    const text = String(rawText || "");
+    const format = detectStrongsFormat(text);
+    if (format === "none") {
+      return { format, tokens: [{ text: stripTags(text).trim(), strongs: [] }] };
+    }
+    const tokens = [];
+    if (format === "bolls") {
+      const re = /<S>\s*(\d+)\s*<\/S>/gi;
+      let last = 0, m;
+      while ((m = re.exec(text)) !== null) {
+        const chunk = stripTags(text.slice(last, m.index));
+        const num = normalizeStrongsNumber(m[1], testament);
+        if (chunk.trim()) tokens.push({ text: chunk.trim(), strongs: num ? [num] : [] });
+        else if (num && tokens.length) tokens[tokens.length - 1].strongs.push(num);
+        last = re.lastIndex;
+      }
+      const tail = stripTags(text.slice(last));
+      if (tail.trim()) tokens.push({ text: tail.trim(), strongs: [] });
+    } else {
+      const re = /<w\s([^>]*)>([\s\S]*?)<\/w>/gi;
+      let last = 0, m;
+      while ((m = re.exec(text)) !== null) {
+        const between = stripTags(text.slice(last, m.index));
+        if (between.trim()) tokens.push({ text: between.trim(), strongs: [] });
+        const word = stripTags(m[2]).trim();
+        const nums = [];
+        const lemmaMatch = m[1].match(/lemma\s*=\s*"([^"]*)"/i);
+        if (lemmaMatch) {
+          for (const part of lemmaMatch[1].split(/\s+/)) {
+            const sm = part.match(/strong:([HG]?\d+)/i);
+            if (sm) { const n = normalizeStrongsNumber(sm[1], testament); if (n) nums.push(n); }
+          }
+        }
+        if (word) tokens.push({ text: word, strongs: nums });
+        last = re.lastIndex;
+      }
+      const tail = stripTags(text.slice(last));
+      if (tail.trim()) tokens.push({ text: tail.trim(), strongs: [] });
+    }
+    return { format, tokens };
+  }
+
+  async function downloadTaggedText(trId, onProgress) {
+    const src = BOLLS_TAGGED[trId];
+    const res = await fetch(src.url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    if (!Array.isArray(rows) || !rows.length) throw new Error("Unexpected file format");
+
+    // bolls book ids are 1-66 in canonical order (verified for Genesis=1,
+    // Psalms=19, John=43); anything above 66 is Apocrypha, which we skip.
+    const formatCounts = {};
+    let stored = 0, tagged = 0;
+    const db = await openDB();
+    const BATCH = 2000;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const chunk = rows.slice(i, i + BATCH);
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("tagged", "readwrite");
+        const store = tx.objectStore("tagged");
+        for (const r of chunk) {
+          const bookIdx = parseInt(r.book, 10) - 1;
+          if (!(bookIdx >= 0 && bookIdx < 66)) continue;
+          const book = BOOKS[bookIdx];
+          const chapter = parseInt(r.chapter, 10);
+          const verse = parseInt(r.verse, 10);
+          if (!book || !chapter || !verse) continue;
+          const parsed = parseStrongsTags(r.text, book.testament);
+          formatCounts[parsed.format] = (formatCounts[parsed.format] || 0) + 1;
+          if (parsed.format !== "none") tagged++;
+          store.put({ ref: `${book.name}|${chapter}|${verse}`, tr: trId, tokens: parsed.tokens });
+          stored++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+      onProgress(Math.min(i + BATCH, rows.length), rows.length);
+    }
+    if (!stored) throw new Error("Downloaded the file, but no verses matched the expected shape");
+    const dominant = Object.entries(formatCounts).sort((a, b) => b[1] - a[1])[0];
+    await setMeta("tagged-" + trId, {
+      downloaded: true, verses: stored, taggedVerses: tagged,
+      format: dominant ? dominant[0] : "none", downloadedAt: Date.now(),
+    });
+    return { stored, tagged, format: dominant ? dominant[0] : "none" };
+  }
+
+  async function getTaggedVerse(bookName, chapter, verse) {
+    const db = await openDB();
+    const tx = db.transaction("tagged", "readonly");
+    return await idbReq(tx.objectStore("tagged").get(`${bookName}|${chapter}|${verse}`));
+  }
+
+  async function getTaggedChapter(bookName, chapter) {
+    const db = await openDB();
+    const tx = db.transaction("tagged", "readonly");
+    const all = await idbReq(tx.objectStore("tagged").getAll());
+    const prefix = `${bookName}|${chapter}|`;
+    const map = {};
+    for (const rec of all) if (rec.ref.startsWith(prefix)) map[rec.ref.split("|")[2]] = rec.tokens;
+    return map;
+  }
+
+  // Live lexicon lookup (Brown-Driver-Briggs / Thayer's) with the offline
+  // Strong's dictionary as fallback, so this works without connectivity
+  // once that's downloaded.
+  async function lookupStrongs(number) {
+    const offline = await getStrongsEntry(number);
+    if (offline && (offline.def || offline.kjvDef)) {
+      return { source: "offline", key: offline.key, lexeme: offline.lemma,
+        translit: offline.xlit, pron: offline.pron,
+        definitionHtml: escapeHtml(offline.def || ""), kjvDef: offline.kjvDef || "" };
+    }
+    const res = await fetch(`https://bolls.life/dictionary-definition/BDBT/${encodeURIComponent(number)}/`);
+    if (!res.ok) throw new Error(`Lexicon lookup failed (${res.status})`);
+    const list = await res.json();
+    const hit = Array.isArray(list) ? list.find((d) => normalizeStrongsNumber(d.topic, "OT") === number) || list[0] : null;
+    if (!hit) throw new Error("No lexicon entry found for " + number);
+    return { source: "live", key: hit.topic, lexeme: hit.lexeme,
+      translit: hit.transliteration, pron: hit.pronunciation,
+      definitionHtml: sanitizeLexiconHtml(hit.definition || ""), kjvDef: hit.short_definition || "" };
+  }
+
+  // The lexicon returns HTML. Keep only harmless formatting tags and drop
+  // everything else (including any anchors/scripts) rather than trusting it.
+  function sanitizeLexiconHtml(html) {
+    let out = String(html).replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
+    out = out.replace(/<\/?([a-z0-9]+)[^>]*>/gi, (full, tag) => {
+      const allowed = ["b", "i", "em", "strong", "p", "br", "ol", "ul", "li", "he"];
+      const t = String(tag).toLowerCase();
+      if (!allowed.includes(t)) return "";
+      return full.startsWith("</") ? `</${t}>` : `<${t}>`;
+    });
+    return out;
+  }
+
+  /* =====================================================================
+     Nave's Topical Bible — study by subject rather than by passage
+     ---------------------------------------------------------------------
+     Source: BradyStephenson/bible-data's NavesTopicalDictionary.csv,
+     CC BY 4.0 (Nave's own 1896 work is public domain; the structured
+     dataset carries the CC licence, so the app credits it in the Library
+     card as attribution requires).
+
+     Column headers weren't verified before shipping, so pickColumn matches
+     a set of plausible names per field and the loader throws a readable
+     error naming the actual headers if it can't find what it needs —
+     visible failure beats importing nothing and looking broken.
+  ===================================================================== */
+  const NAVES_URL = "https://raw.githubusercontent.com/BradyStephenson/bible-data/main/NavesTopicalDictionary.csv";
+
+  function parseCsv(text) {
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    const s = String(text);
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (s[i + 1] === '"') { field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else if (c === '"') { inQuotes = true; }
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n") {
+        row.push(field); field = "";
+        if (row.length > 1 || row[0] !== "") rows.push(row);
+        row = [];
+      } else if (c === "\r") { /* handled with the \n */ }
+      else { field += c; }
+    }
+    if (field !== "" || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  function normalizeHeader(h) { return String(h).toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  function pickColumn(headers, candidates) {
+    const norm = headers.map(normalizeHeader);
+    for (const cand of candidates) {
+      const i = norm.indexOf(normalizeHeader(cand));
+      if (i !== -1) return i;
+    }
+    for (const cand of candidates) {
+      const c = normalizeHeader(cand);
+      const i = norm.findIndex((h) => h.includes(c));
+      if (i !== -1) return i;
+    }
+    return -1;
+  }
+  const TOPIC_COLUMNS = ["topic", "naves_topic", "topic_name", "subject", "heading", "name", "entry"];
+  const SUBTOPIC_COLUMNS = ["subtopic", "sub_topic", "subheading", "detail", "description", "text"];
+  const REF_COLUMNS = ["reference", "verse", "scripture", "verse_reference", "ref", "citation", "osis"];
+
+  function buildTopics(csvRows) {
+    if (!csvRows.length) throw new Error("Empty file");
+    const headers = csvRows[0];
+    const ti = pickColumn(headers, TOPIC_COLUMNS);
+    const ri = pickColumn(headers, REF_COLUMNS);
+    const si = pickColumn(headers, SUBTOPIC_COLUMNS);
+    if (ti === -1) throw new Error("Couldn't find a topic column (headers: " + headers.join(", ") + ")");
+    if (ri === -1) throw new Error("Couldn't find a reference column (headers: " + headers.join(", ") + ")");
+    const byTopic = new Map();
+    for (let i = 1; i < csvRows.length; i++) {
+      const r = csvRows[i];
+      const topic = (r[ti] || "").trim();
+      const rawRef = (r[ri] || "").trim();
+      if (!topic || !rawRef) continue;
+      const sub = si !== -1 ? (r[si] || "").trim() : "";
+      const key = topic.toLowerCase();
+      if (!byTopic.has(key)) byTopic.set(key, { topic, subtopics: new Map() });
+      const entry = byTopic.get(key);
+      if (!entry.subtopics.has(sub)) entry.subtopics.set(sub, []);
+      entry.subtopics.get(sub).push(rawRef);
+    }
+    return Array.from(byTopic.entries()).map(([key, v]) => ({
+      key, topic: v.topic,
+      subtopics: Array.from(v.subtopics.entries()).map(([label, refs]) => ({ label, refs })),
+    }));
+  }
+
+  async function downloadNaves(onProgress) {
+    const res = await fetch(NAVES_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const topics = buildTopics(parseCsv(text));
+    if (!topics.length) throw new Error("No topics found in the downloaded file");
+    const db = await openDB();
+    const BATCH = 500;
+    let refCount = 0;
+    for (let i = 0; i < topics.length; i += BATCH) {
+      const chunk = topics.slice(i, i + BATCH);
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("topics", "readwrite");
+        const store = tx.objectStore("topics");
+        for (const t of chunk) {
+          // Normalize each raw reference through the app's own parser so
+          // topical refs use the identical shape as tabs and cross-refs.
+          const subtopics = t.subtopics.map((st) => {
+            const refs = [];
+            for (const raw of st.refs) {
+              const p = parseReference(raw);
+              if (p) {
+                refs.push({ book: p.book.name, chapter: p.chapter,
+                  verseStart: p.verseStart, verseEnd: p.verseEnd });
+                refCount++;
+              }
+            }
+            return { label: st.label, refs };
+          }).filter((st) => st.refs.length);
+          if (!subtopics.length) continue;
+          store.put({ key: t.key, topic: t.topic, subtopics });
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+      onProgress(Math.min(i + BATCH, topics.length), topics.length);
+    }
+    if (!refCount) throw new Error("Topics loaded but no references could be parsed — the reference format may differ from what's expected");
+    await setMeta("naves", { downloaded: true, topics: topics.length, refs: refCount, downloadedAt: Date.now() });
+    return { topics: topics.length, refs: refCount };
+  }
+
+  let topicsSearchCache = null;
+  async function searchTopics(query) {
+    if (!topicsSearchCache) {
+      const db = await openDB();
+      const tx = db.transaction("topics", "readonly");
+      topicsSearchCache = await idbReq(tx.objectStore("topics").getAll());
+    }
+    const q = query.trim().toLowerCase();
+    if (!q) return topicsSearchCache.slice(0, 60);
+    // Prefer topics that start with the query, then any that contain it.
+    const starts = [], contains = [];
+    for (const t of topicsSearchCache) {
+      if (t.key.startsWith(q)) starts.push(t);
+      else if (t.key.includes(q)) contains.push(t);
+    }
+    return starts.concat(contains).slice(0, 120);
+  }
+
+  async function getTopic(key) {
+    const db = await openDB();
+    const tx = db.transaction("topics", "readonly");
+    return await idbReq(tx.objectStore("topics").get(String(key).toLowerCase()));
+  }
+
+  /* =====================================================================
      Tabs (localStorage) + Highlights color cycle
   ===================================================================== */
   const HL_CYCLE = [null, "yellow", "green", "blue", "pink"];
@@ -1068,6 +1709,7 @@
     compareRight: "ASV",
     activeTabId: null,
     verseFocus: null,
+    strongsMode: false,
   };
   let searchIndexCache = {};
 
@@ -1095,7 +1737,7 @@
     if (name === "read") renderRead();
     if (name === "compare") renderCompare();
     if (name === "search") renderSearchTr();
-    if (name === "library") { renderLibrary(); renderAiPanel(); renderApologeticsList(); }
+    if (name === "library") { renderLibrary(); renderAiPanel(); renderStrongsCards(); renderTaggedCards(); renderXrefCards(); renderNavesCards(); renderBackupPanel(); renderApologeticsList(); }
     if (name === "study") renderStudyView();
   }
 
@@ -1105,12 +1747,25 @@
     return s;
   }
 
-  function renderVerseHtml(row, highlightMap, focusVerse) {
+  function renderVerseHtml(row, highlightMap, focusVerse, noteMap, tokenMap) {
     const color = highlightMap[row.verse];
     const cls = ["verse"];
     if (color) cls.push("hl-" + color);
     if (focusVerse && row.verse === focusVerse) cls.push("flash");
-    return `<span class="${cls.join(" ")}" data-book="${escapeHtml(row.book)}" data-chapter="${row.chapter}" data-verse="${row.verse}"><sup class="vnum">${row.verse}</sup>${escapeHtml(row.text)} </span>`;
+    const hasNote = noteMap && noteMap[row.verse];
+    const marker = hasNote ? `<sup class="notemark" title="Has a note">\u270e</sup>` : "";
+    // In Strong's mode, render each tagged word as its own tappable span.
+    // Falls back to the plain verse whenever tokens aren't available.
+    const tokens = tokenMap && tokenMap[row.verse];
+    let body;
+    if (tokens && tokens.length) {
+      body = tokens.map((t) => t.strongs && t.strongs.length
+        ? `<span class="sword" data-strongs="${escapeHtml(t.strongs.join(","))}">${escapeHtml(t.text)}</span>`
+        : escapeHtml(t.text)).join(" ");
+    } else {
+      body = escapeHtml(row.text);
+    }
+    return `<span class="${cls.join(" ")}" data-book="${escapeHtml(row.book)}" data-chapter="${row.chapter}" data-verse="${row.verse}"><sup class="vnum">${row.verse}</sup>${body}${marker} </span>`;
   }
 
   /* ---- Read view ---- */
@@ -1120,15 +1775,25 @@
     $("#readChapterTitle").textContent = `${state.book.name} ${state.chapter}`;
     $("#readBody").innerHTML = `<div class="page-loading">Loading…</div>`;
     try {
-      const [rows, hl] = await Promise.all([
+      const [rows, hl, notes] = await Promise.all([
         getChapterVerses(state.readTr, state.book, state.chapter),
         getAllHighlightsForChapter(state.book.name, state.chapter),
+        getAllNotesForChapter(state.book.name, state.chapter),
       ]);
       if (!rows.length) {
         $("#readBody").innerHTML = `<div class="hint">Couldn't load this chapter (offline, and not cached yet). Try again once you're back online, or download ${state.readTr} in Library for full offline access.</div>`;
         return;
       }
-      $("#readBody").innerHTML = rows.map((r) => renderVerseHtml(r, hl, state.verseFocus)).join("");
+      let tokenMap = null;
+      if (state.strongsMode) {
+        tokenMap = await getTaggedChapter(state.book.name, state.chapter);
+        if (!Object.keys(tokenMap).length) tokenMap = null;
+      }
+      $("#readBody").innerHTML =
+        (state.strongsMode && !tokenMap
+          ? `<div class="hint">No Strong's-tagged text stored for this chapter yet — download it under Library \u203a Hebrew &amp; Greek.</div>`
+          : "") +
+        rows.map((r) => renderVerseHtml(r, hl, state.verseFocus, notes, tokenMap)).join("");
       state.verseFocus = null;
     } catch (e) {
       const msg = (e && e.message && e.message.includes("only covers")) ? e.message : "Couldn't load this chapter. Check your connection and try again.";
@@ -1157,12 +1822,13 @@
       const trId = state[key];
       const pane = spread.querySelector(`[data-pane="${key}"]`);
       try {
-        const [rows, hl] = await Promise.all([
+        const [rows, hl, notes] = await Promise.all([
           getChapterVerses(trId, state.book, state.chapter),
           getAllHighlightsForChapter(state.book.name, state.chapter),
+          getAllNotesForChapter(state.book.name, state.chapter),
         ]);
         pane.innerHTML = rows.length
-          ? rows.map((r) => renderVerseHtml(r, hl, state.verseFocus)).join("")
+          ? rows.map((r) => renderVerseHtml(r, hl, state.verseFocus, notes)).join("")
           : `<span class="page-loading">Not available offline yet.</span>`;
       } catch (e) {
         pane.innerHTML = `<span class="page-loading">Couldn't load.</span>`;
@@ -1229,15 +1895,16 @@
       const pane = spread.querySelector(`[data-idx="${i}"]`);
       if (!book) { pane.innerHTML = `<span class="page-loading">Unknown book.</span>`; continue; }
       try {
-        const [rows, hl] = await Promise.all([
+        const [rows, hl, notes] = await Promise.all([
           getChapterVerses(tab.translationId, book, r.chapter),
           getAllHighlightsForChapter(book.name, r.chapter),
+          getAllNotesForChapter(book.name, r.chapter),
         ]);
         const filtered = r.verseStart
           ? rows.filter((v) => v.verse >= r.verseStart && v.verse <= r.verseEnd)
           : rows;
         pane.innerHTML = filtered.length
-          ? filtered.map((v) => renderVerseHtml(v, hl, null)).join("")
+          ? filtered.map((v) => renderVerseHtml(v, hl, null, notes)).join("")
           : `<span class="page-loading">Not available offline yet.</span>`;
       } catch (e) {
         pane.innerHTML = `<span class="page-loading">Couldn't load.</span>`;
@@ -1346,9 +2013,61 @@
     $$("#searchModeToggle button").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
     $("#searchForm").style.display = mode === "verses" ? "flex" : "none";
     $("#tabSearchForm").style.display = mode === "tabs" ? "flex" : "none";
+    $("#topicSearchForm").style.display = mode === "topics" ? "flex" : "none";
     $("#searchResults").innerHTML = "";
     if (mode === "tabs") runTabSearch($("#tabSearchInput").value);
+    if (mode === "topics") runTopicSearch($("#topicSearchInput").value);
   }
+
+  let lastTopicResults = [];
+  async function runTopicSearch(query) {
+    const results = $("#searchResults");
+    const meta = await getMeta("naves");
+    if (!meta || !meta.downloaded) {
+      results.innerHTML = `<div class="hint">Nave's Topical isn't downloaded yet — grab it under <strong>Library \u203a Topical study</strong> to search by subject.</div>`;
+      return;
+    }
+    const matches = await searchTopics(query || "");
+    lastTopicResults = matches;
+    if (!matches.length) {
+      results.innerHTML = `<div class="hint">No topics match \u201c${escapeHtml(query)}.\u201d</div>`;
+      return;
+    }
+    results.innerHTML = matches.map((t, i) => {
+      const refCount = t.subtopics.reduce((n, st) => n + st.refs.length, 0);
+      return `<div class="result" data-i="${i}">
+        <div class="result-ref">${refCount} reference${refCount === 1 ? "" : "s"}${t.subtopics.length > 1 ? ` \u00b7 ${t.subtopics.length} groupings` : ""}</div>
+        <div class="result-text"><strong>${escapeHtml(t.topic)}</strong></div>
+      </div>`;
+    }).join("");
+    results.querySelectorAll(".result").forEach((el) => {
+      el.addEventListener("click", () => openTopicSheet(lastTopicResults[parseInt(el.dataset.i, 10)]));
+    });
+  }
+
+  function openTopicSheet(topic) {
+    if (!topic) return;
+    $("#topicSheetName").textContent = topic.topic;
+    const total = topic.subtopics.reduce((n, st) => n + st.refs.length, 0);
+    $("#topicSheetStatus").textContent = `${total} reference${total === 1 ? "" : "s"} — tap one to read it, or save the whole topic as a tab.`;
+    $("#topicSheetList").innerHTML = topic.subtopics.map((st, si) => `
+      ${st.label ? `<div class="testament-label" style="margin-top:10px">${escapeHtml(st.label)}</div>` : ""}
+      <div>${st.refs.map((r, ri) => `<button class="topic-ref" data-si="${si}" data-ri="${ri}">${escapeHtml(refLabel(r.book, r.chapter, r.verseStart, r.verseEnd))}</button>`).join("")}</div>
+    `).join("");
+    $("#topicSheetList").querySelectorAll(".topic-ref").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const r = topic.subtopics[parseInt(btn.dataset.si, 10)].refs[parseInt(btn.dataset.ri, 10)];
+        const book = bookByName(r.book);
+        if (!book) return;
+        state.book = book; state.chapter = r.chapter; state.verseFocus = r.verseStart;
+        $("#topicSheetBackdrop").classList.remove("show");
+        setView("read");
+      });
+    });
+    currentTopic = topic;
+    $("#topicSheetBackdrop").classList.add("show");
+  }
+  let currentTopic = null;
 
   function runTabSearch(query) {
     const results = $("#searchResults");
@@ -1464,10 +2183,28 @@
   ===================================================================== */
   let sheetCtx = null;
 
+  // Notes save on any exit path (highlight tap, Close, backdrop tap) so a
+  // typed note is never silently lost. Returns whether anything changed,
+  // so callers can decide if a re-render is needed.
+  async function saveSheetNote() {
+    if (!sheetCtx) return false;
+    const ref = `${sheetCtx.book}|${sheetCtx.chapter}|${sheetCtx.verse}`;
+    const typed = $("#vsNoteInput").value;
+    const existing = await getNote(ref);
+    if ((typed || "").trim() === (existing || "").trim()) return false;
+    await setNote(ref, typed);
+    broadcastNote(ref, typed);
+    return true;
+  }
+
   function openVerseSheet(bookName, chapter, verse, text) {
     sheetCtx = { book: bookName, chapter, verse, text };
+    const noteRef = `${bookName}|${chapter}|${verse}`;
     $("#vsRef").textContent = `${bookName} ${chapter}:${verse}`;
     $("#vsText").textContent = text;
+    $("#vsNoteInput").value = "";
+    $("#vsNoteStatus").textContent = "";
+    getNote(noteRef).then((existing) => { $("#vsNoteInput").value = existing || ""; });
     getHighlight(`${bookName}|${chapter}|${verse}`).then((current) => {
       $("#vsSwatches").innerHTML = HL_CYCLE.map((c) => {
         const cls = c ? "swatch hl-" + c : "swatch none";
@@ -1476,8 +2213,10 @@
       }).join("");
       $("#vsSwatches").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
+          await saveSheetNote();
           await setHighlight(`${bookName}|${chapter}|${verse}`, b.dataset.color || null);
-          closeVerseSheet();
+          broadcastHighlight(`${bookName}|${chapter}|${verse}`, b.dataset.color || null);
+          $("#verseSheetBackdrop").classList.remove("show"); // note already saved above
           if (state.view === "read") renderRead();
           else if (state.view === "compare") renderCompare();
           else if (state.view === "tab" && state.activeTabId) openTab(state.activeTabId);
@@ -1492,6 +2231,7 @@
         tabs.map((t) => `<option value="${t.id}">${escapeHtml(t.label)}</option>`).join("")}</select>`;
     }
     actions += `<button id="vsAskAi">✦ Find cross-references (AI)</button>`;
+    actions += `<button id="vsXref">\u{1F4DA} Traditional cross-references (TSK)</button>`;
     actions += `<button id="vsCopy">Copy text</button><button id="vsClose">Close</button>`;
     $("#vsActions").innerHTML = actions;
 
@@ -1528,17 +2268,64 @@
       closeVerseSheet();
       openAiSuggestSheet(bookName, chapter, verse, verse, text);
     });
+    $("#vsXref").addEventListener("click", () => {
+      closeVerseSheet();
+      openXrefSheet(bookName, chapter, verse);
+    });
     $("#vsClose").addEventListener("click", closeVerseSheet);
 
     $("#verseSheetBackdrop").classList.add("show");
   }
-  function closeVerseSheet() { $("#verseSheetBackdrop").classList.remove("show"); }
+  function closeVerseSheet() {
+    // Hide immediately so the sheet never lingers on screen, then persist
+    // the note in the background and re-render only if it actually changed.
+    $("#verseSheetBackdrop").classList.remove("show");
+    saveSheetNote().then((changed) => {
+      if (!changed) return;
+      if (state.view === "read") renderRead();
+      else if (state.view === "compare") renderCompare();
+      else if (state.view === "tab" && state.activeTabId) openTab(state.activeTabId);
+    }).catch(() => {});
+  }
 
   document.addEventListener("click", (ev) => {
+    // A tagged word takes precedence over the verse sheet, so tapping a word
+    // in Strong's mode opens the lexicon rather than the verse actions.
+    const w = ev.target.closest(".sword");
+    if (w) {
+      ev.stopPropagation();
+      openStrongsWordSheet(w.dataset.strongs.split(","), w.textContent.trim());
+      return;
+    }
     const v = ev.target.closest(".verse");
     if (!v) return;
     openVerseSheet(v.dataset.book, parseInt(v.dataset.chapter, 10), parseInt(v.dataset.verse, 10), v.textContent.trim());
   });
+
+  // Word-level lexicon sheet. Reuses the Strong's entry sheet, and handles a
+  // word carrying several numbers by showing each in turn.
+  async function openStrongsWordSheet(numbers, word) {
+    $("#strongsEntryKey").textContent = word;
+    $("#strongsEntryBody").innerHTML = `<div class="page-loading">Looking up ${escapeHtml(numbers.join(", "))}\u2026</div>`;
+    $("#strongsEntryBackdrop").classList.add("show");
+    const parts = [];
+    for (const num of numbers) {
+      try {
+        const e = await lookupStrongs(num);
+        parts.push(`
+          <div style="padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)">
+            <div style="font-family:var(--font-display);font-weight:600;font-size:15px">${escapeHtml(e.key)}${e.lexeme ? " \u00b7 " + escapeHtml(e.lexeme) : ""}</div>
+            ${e.translit ? `<div style="font-family:var(--font-ui);font-size:12.5px;color:var(--ink-soft)">${escapeHtml(e.translit)}${e.pron ? " \u00b7 " + escapeHtml(e.pron) : ""}</div>` : ""}
+            ${e.kjvDef ? `<div style="margin-top:6px"><strong>Rendered as:</strong> ${escapeHtml(e.kjvDef)}</div>` : ""}
+            <div style="margin-top:6px">${e.definitionHtml}</div>
+            <div style="font-family:var(--font-ui);font-size:11px;color:var(--ink-faint);margin-top:6px">${e.source === "offline" ? "From your downloaded dictionary" : "Brown-Driver-Briggs / Thayer's (online)"}</div>
+          </div>`);
+      } catch (err) {
+        parts.push(`<div class="hint">Couldn't look up ${escapeHtml(num)}: ${escapeHtml(err && err.message ? err.message : "unknown error")}</div>`);
+      }
+    }
+    $("#strongsEntryBody").innerHTML = parts.join("");
+  }
 
   /* =====================================================================
      AI-assisted cross-references
@@ -1631,66 +2418,70 @@
     return out;
   }
 
+  function buildCorrelationPrompt(refText, passageText) {
+    return "You are assisting with Bible study cross-referencing in an app called Berea. For this passage \u2014 " + refText + ': "' + passageText + '" \u2014 suggest up to 6 genuinely illuminating cross-references: verses that quote it, are quoted by it, fulfill it, parallel it thematically, or form an \u201cundesigned coincidence\u201d (an incidental detail in another passage that interlocks with this one in a way that looks unplanned, sometimes used as evidence of authenticity). For each, give one short sentence on why it connects. Respond with ONLY valid JSON, no markdown fences, no commentary before or after, in exactly this shape: {"suggestions":[{"reference":"Book Chapter:Verse","note":"...","type":"cross-reference"}]}. Use "type" values only from: cross-reference, thematic, undesigned-coincidence.';
+  }
+
   async function queryAiForCorrelations(refText, passageText) {
     const cfg = getAiConfig();
     if (!cfg) throw new Error("no-config");
-    const prompt = "You are assisting with Bible study cross-referencing. For this passage \u2014 " + refText + ': "' + passageText + '" \u2014 suggest up to 6 genuinely illuminating cross-references: verses that quote it, are quoted by it, fulfill it, parallel it thematically, or form an \u201cundesigned coincidence\u201d (an incidental detail in another passage that interlocks with this one in a way that looks unplanned, sometimes used as evidence of authenticity). For each, give one short sentence on why it connects. Respond with ONLY valid JSON, no markdown fences, no other text, in exactly this shape: {"suggestions":[{"reference":"Book Chapter:Verse","note":"...","type":"cross-reference"}]}. Use "type" values only from: cross-reference, thematic, undesigned-coincidence.';
+    const prompt = buildCorrelationPrompt(refText, passageText);
     const raw = cfg.provider === "anthropic" ? await callAnthropic(cfg, prompt) : await callOpenAiCompatible(cfg, prompt);
     return parseAiSuggestions(raw);
   }
 
   let currentAiSuggestions = [];
   let currentAiSeed = null;
+  let currentAiSeedText = "";
 
   function openAiSuggestSheet(bookName, chapter, verseStart, verseEnd, text) {
-    const cfg = getAiConfig();
-    if (!cfg) { openAiConfigSheet(() => openAiSuggestSheet(bookName, chapter, verseStart, verseEnd, text)); return; }
     currentAiSeed = { book: bookName, chapter, verseStart, verseEnd };
+    currentAiSeedText = text;
     const refText = refLabel(bookName, chapter, verseStart, verseEnd);
     $("#aiSuggestRef").textContent = refText;
-    const who = cfg.provider === "anthropic" ? "Claude" : cfg.provider === "openai" ? "OpenAI" : "your AI";
-    $("#aiSuggestStatus").textContent = "Asking " + who + " for cross-references\u2026";
+    $("#aiPromptText").value = buildCorrelationPrompt(refText, text);
+    $("#aiPasteInput").value = "";
+    $("#aiSuggestStatus").textContent = "";
     $("#aiSuggestList").innerHTML = "";
     currentAiSuggestions = [];
     $("#aiSuggestBackdrop").classList.add("show");
+  }
 
-    queryAiForCorrelations(refText, text).then((suggestions) => {
-      currentAiSuggestions = suggestions;
-      if (!suggestions.length) {
-        $("#aiSuggestStatus").textContent = "No suggestions came back. Try again, or check the API key and model in settings.";
-        return;
-      }
-      $("#aiSuggestStatus").textContent = suggestions.length + " suggestion" + (suggestions.length === 1 ? "" : "s") + " \u2014 review and add what's useful.";
-      $("#aiSuggestList").innerHTML = suggestions.map((s, i) => `
-        <label class="ai-suggestion">
-          <input type="checkbox" data-i="${i}" checked>
-          <div>
-            <span class="ai-type">${escapeHtml(s.type)}</span><br>
-            <span class="ai-ref">${escapeHtml(refLabel(s.book, s.chapter, s.verseStart, s.verseEnd))}</span>
-            <div class="ai-note">${escapeHtml(s.note)}</div>
-          </div>
-        </label>`).join("");
-    }).catch((err) => {
-      $("#aiSuggestStatus").textContent = "Couldn't get suggestions: " + (err && err.message ? err.message : "unknown error") + ". Check the API key in settings and try again.";
-    });
+  function renderAiSuggestionsList(suggestions) {
+    currentAiSuggestions = suggestions;
+    if (!suggestions.length) {
+      $("#aiSuggestStatus").textContent = "Couldn't find any usable suggestions in that \u2014 make sure you pasted the AI's JSON reply itself, not its whole message with extra commentary.";
+      $("#aiSuggestList").innerHTML = "";
+      return;
+    }
+    $("#aiSuggestStatus").textContent = suggestions.length + " suggestion" + (suggestions.length === 1 ? "" : "s") + " \u2014 review and add what's useful.";
+    $("#aiSuggestList").innerHTML = suggestions.map((s, i) => `
+      <label class="ai-suggestion">
+        <input type="checkbox" data-i="${i}" checked>
+        <div>
+          <span class="ai-type">${escapeHtml(s.type)}</span><br>
+          <span class="ai-ref">${escapeHtml(refLabel(s.book, s.chapter, s.verseStart, s.verseEnd))}</span>
+          <div class="ai-note">${escapeHtml(s.note)}</div>
+        </div>
+      </label>`).join("");
   }
 
   function renderAiPanel() {
     const wrap = $("#aiPanel");
     if (!wrap) return;
     const cfg = getAiConfig();
-    const who = cfg ? (cfg.provider === "anthropic" ? "Claude" : cfg.provider === "openai" ? "OpenAI" : "Custom provider") : "Not configured";
+    const who = cfg ? (cfg.provider === "anthropic" ? "Claude" : cfg.provider === "openai" ? "OpenAI" : "Custom provider") : null;
     wrap.innerHTML = `
+      <button class="dl" id="aiAskChapterBtn" style="width:100%;margin-bottom:10px">\u2726 Get a correlation prompt for ${escapeHtml(state.book.name)} ${state.chapter}</button>
       <div class="trcard">
         <div class="trcard-head">
           <div>
-            <div class="trcard-name">${who}</div>
-            <div class="trcard-status">${cfg ? "Key saved in this browser" + (cfg.model ? " \u00b7 model: " + escapeHtml(cfg.model) : "") : "Add your own API key to enable this"}</div>
+            <div class="trcard-name">Connect an API directly (optional)</div>
+            <div class="trcard-status">${cfg ? "Connected \u2014 " + who + (cfg.model ? " \u00b7 " + escapeHtml(cfg.model) : "") : "Skip this \u2014 copy/paste works with no setup. Only add a key for one-tap automation."}</div>
           </div>
           <button class="dl" id="aiConfigBtn">${cfg ? "Change" : "Set up"}</button>
         </div>
       </div>
-      <button class="dl" id="aiAskChapterBtn" style="width:100%;margin-top:10px">\u2726 Find correlations for ${escapeHtml(state.book.name)} ${state.chapter}</button>
     `;
     $("#aiConfigBtn").addEventListener("click", () => openAiConfigSheet(renderAiPanel));
     $("#aiAskChapterBtn").addEventListener("click", async () => {
@@ -1700,6 +2491,374 @@
         text = rows.map((r) => r.verse + ". " + r.text).join(" ").slice(0, 1200);
       } catch (e) { /* fall back to reference-only prompt */ }
       openAiSuggestSheet(state.book.name, state.chapter, null, null, text);
+    });
+  }
+
+  /* =====================================================================
+     Strong's Dictionary & TSK cross-reference UI (Library panels + sheets)
+  ===================================================================== */
+  async function renderNavesCards() {
+    const wrap = $("#navesCards");
+    if (!wrap) return;
+    const meta = await getMeta("naves");
+    wrap.innerHTML = `
+      <div class="trcard">
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">Nave's Topical Bible</div>
+            <div class="trcard-status">${meta && meta.downloaded
+              ? `${meta.topics.toLocaleString()} topics \u00b7 ${meta.refs.toLocaleString()} references`
+              : "Not downloaded yet"}</div>
+          </div>
+          <button class="dl" id="navesDlBtn">${meta && meta.downloaded ? "Re-download" : "Download"}</button>
+        </div>
+        <div class="progress-track" id="prog-naves"><div class="progress-fill" id="progfill-naves"></div></div>
+        <div style="font-family:var(--font-ui);font-size:11px;color:var(--ink-faint);margin-top:10px;line-height:1.45">
+          Nave's Topical Bible (Orville J. Nave, 1896) is public domain. Structured dataset by
+          Brady Stephenson, <a href="https://github.com/BradyStephenson/bible-data" target="_blank" rel="noopener" style="color:var(--cover)">BibleData</a>,
+          used under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" style="color:var(--cover)">CC BY 4.0</a>.
+        </div>
+      </div>
+    `;
+    $("#navesDlBtn").addEventListener("click", async () => {
+      const btn = $("#navesDlBtn");
+      btn.disabled = true;
+      const track = $("#prog-naves"), fill = $("#progfill-naves");
+      track.classList.add("show");
+      try {
+        const r = await downloadNaves((d, t) => { fill.style.width = Math.round((d / t) * 100) + "%"; });
+        topicsSearchCache = null;
+        toast(`${r.topics.toLocaleString()} topics ready`);
+      } catch (e) {
+        toast("Couldn't download: " + (e && e.message ? e.message : "network error"));
+      }
+      btn.disabled = false;
+      renderNavesCards();
+    });
+  }
+
+  async function renderTaggedCards() {
+    const wrap = $("#taggedCards");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    for (const trId of Object.keys(BOLLS_TAGGED)) {
+      const src = BOLLS_TAGGED[trId];
+      const meta = await getMeta("tagged-" + trId);
+      let status;
+      if (!meta || !meta.downloaded) status = "Not downloaded yet";
+      else if (meta.format === "none") status = `${meta.verses.toLocaleString()} verses stored, but no Strong's tags were found \u2014 readable, but tapping won't work`;
+      else status = `${meta.taggedVerses.toLocaleString()} tagged verses (${escapeHtml(meta.format)} format)`;
+      const card = document.createElement("div");
+      card.className = "trcard";
+      card.innerHTML = `
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">${escapeHtml(src.label)}</div>
+            <div class="trcard-status">${status}</div>
+          </div>
+          <button class="dl" data-tagged="${trId}">${meta && meta.downloaded ? "Re-download" : "Download"}</button>
+        </div>
+        <div class="progress-track" id="prog-tagged-${trId}"><div class="progress-fill" id="progfill-tagged-${trId}"></div></div>
+      `;
+      wrap.appendChild(card);
+    }
+    wrap.querySelectorAll("button[data-tagged]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const trId = btn.dataset.tagged;
+        btn.disabled = true;
+        const track = $("#prog-tagged-" + trId), fill = $("#progfill-tagged-" + trId);
+        track.classList.add("show");
+        try {
+          const r = await downloadTaggedText(trId, (d, t) => { fill.style.width = Math.round((d / t) * 100) + "%"; });
+          toast(r.format === "none"
+            ? "Downloaded, but found no Strong's tags in this text"
+            : `${trId}: ${r.tagged.toLocaleString()} tagged verses ready`);
+        } catch (e) {
+          toast("Couldn't download: " + (e && e.message ? e.message : "network error"));
+        }
+        btn.disabled = false;
+        renderTaggedCards();
+      });
+    });
+  }
+
+  async function renderStrongsCards() {
+    const wrap = $("#strongsCards");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    for (const lang of ["hebrew", "greek"]) {
+      const meta = await getMeta("strongs-" + lang);
+      const label = lang === "hebrew" ? "Hebrew (Old Testament)" : "Greek (New Testament)";
+      const card = document.createElement("div");
+      card.className = "trcard";
+      card.innerHTML = `
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">${label}</div>
+            <div class="trcard-status">${meta && meta.downloaded ? meta.count.toLocaleString() + " entries downloaded" : "Not downloaded yet"}</div>
+          </div>
+          <button class="dl" data-lang="${lang}">${meta && meta.downloaded ? "Re-download" : "Download"}</button>
+        </div>
+        <div class="progress-track" id="prog-strongs-${lang}"><div class="progress-fill" id="progfill-strongs-${lang}"></div></div>
+      `;
+      wrap.appendChild(card);
+    }
+    wrap.querySelectorAll("button[data-lang]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const lang = btn.dataset.lang;
+        btn.disabled = true;
+        const track = $("#prog-strongs-" + lang), fill = $("#progfill-strongs-" + lang);
+        track.classList.add("show");
+        try {
+          await downloadStrongsDict(lang, (done, total) => { fill.style.width = Math.round((done / total) * 100) + "%"; });
+          strongsSearchCache = null;
+          toast((lang === "hebrew" ? "Hebrew" : "Greek") + " dictionary downloaded");
+        } catch (e) {
+          toast("Couldn't download: " + (e && e.message ? e.message : "network error"));
+        }
+        btn.disabled = false;
+        renderStrongsCards();
+      });
+    });
+  }
+
+  async function renderXrefCards() {
+    const wrap = $("#xrefCards");
+    if (!wrap) return;
+    const meta = await getMeta("xrefs");
+    wrap.innerHTML = `
+      <div class="trcard">
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">Treasury of Scripture Knowledge</div>
+            <div class="trcard-status">${meta && meta.downloaded ? meta.count.toLocaleString() + " cross-references downloaded" : "Not downloaded yet \u2014 several hundred thousand rows"}</div>
+          </div>
+          <button class="dl" id="xrefDlBtn">${meta && meta.downloaded ? "Re-download" : "Download"}</button>
+        </div>
+        <div class="progress-track" id="prog-xrefs"><div class="progress-fill" id="progfill-xrefs"></div></div>
+      </div>
+    `;
+    $("#xrefDlBtn").addEventListener("click", async () => {
+      const btn = $("#xrefDlBtn");
+      btn.disabled = true;
+      const track = $("#prog-xrefs"), fill = $("#progfill-xrefs");
+      track.classList.add("show");
+      try {
+        await downloadCrossReferences((done, total) => { fill.style.width = Math.round((done / total) * 100) + "%"; });
+        toast("Cross-references downloaded");
+      } catch (e) {
+        toast("Couldn't download: " + (e && e.message ? e.message : "network error") + " \u2014 the source file may have moved; try again later.");
+      }
+      btn.disabled = false;
+      renderXrefCards();
+    });
+  }
+
+  let lastStrongsResults = [];
+  function renderStrongsSearchResults(results) {
+    lastStrongsResults = results;
+    const wrap = $("#strongsResults");
+    if (!wrap) return;
+    if (!results.length) { wrap.innerHTML = `<div class="hint">No matches. Try a KJV word (e.g. "love"), a transliteration (e.g. "agape"), or a number (e.g. H7225, G26).</div>`; return; }
+    wrap.innerHTML = results.map((e, i) => `
+      <div class="result" data-i="${i}">
+        <div class="result-ref">${e.key}${e.xlit ? " \u00b7 " + escapeHtml(e.xlit) : ""}</div>
+        <div class="result-text"><strong>${escapeHtml(e.lemma)}</strong> \u2014 ${escapeHtml((e.kjvDef || e.def || "").slice(0, 100))}</div>
+      </div>`).join("");
+    wrap.querySelectorAll(".result").forEach((el) => {
+      el.addEventListener("click", () => openStrongsEntry(lastStrongsResults[parseInt(el.dataset.i, 10)]));
+    });
+  }
+
+  function openStrongsEntry(entry) {
+    $("#strongsEntryKey").textContent = entry.key + (entry.lemma ? " \u00b7 " + entry.lemma : "");
+    $("#strongsEntryBody").innerHTML = `
+      ${entry.xlit ? `<div><strong>Transliteration:</strong> ${escapeHtml(entry.xlit)}</div>` : ""}
+      ${entry.pron ? `<div><strong>Pronunciation:</strong> ${escapeHtml(entry.pron)}</div>` : ""}
+      ${entry.derivation ? `<div style="margin-top:6px"><strong>Derivation:</strong> ${escapeHtml(entry.derivation)}</div>` : ""}
+      ${entry.def ? `<div style="margin-top:6px"><strong>Definition:</strong> ${escapeHtml(entry.def)}</div>` : ""}
+      ${entry.kjvDef ? `<div style="margin-top:6px"><strong>KJV translates as:</strong> ${escapeHtml(entry.kjvDef)}</div>` : ""}
+      ${!entry.def && !entry.kjvDef ? `<div class="hint">No definition text came through for this entry \u2014 the source field names may differ from what this app expects.</div>` : ""}
+    `;
+    $("#strongsEntryBackdrop").classList.add("show");
+  }
+
+  async function openXrefSheet(bookName, chapter, verse) {
+    $("#xrefSheetRef").textContent = refLabel(bookName, chapter, verse, verse) + " \u2014 cross-references";
+    $("#xrefSheetStatus").textContent = "Looking up\u2026";
+    $("#xrefSheetList").innerHTML = "";
+    $("#xrefSheetBackdrop").classList.add("show");
+    const meta = await getMeta("xrefs");
+    if (!meta || !meta.downloaded) {
+      $("#xrefSheetStatus").textContent = "Not downloaded yet \u2014 open Library and download \u201cTreasury of Scripture Knowledge\u201d cross-references first.";
+      return;
+    }
+    const refs = await getCrossReferences(bookName, chapter, verse);
+    if (!refs.length) {
+      $("#xrefSheetStatus").textContent = "No traditional cross-references found for this verse.";
+      return;
+    }
+    $("#xrefSheetStatus").textContent = refs.length + " cross-reference" + (refs.length === 1 ? "" : "s") + ", most-attested first.";
+    $("#xrefSheetList").innerHTML = refs.slice(0, 40).map((r, i) => `
+      <div class="result" data-i="${i}">
+        <div class="result-ref">${escapeHtml(refLabel(r.toBook, r.toChapter, r.toVerseStart, r.toVerseEnd))}</div>
+        <div class="result-text" style="color:var(--ink-soft);font-size:13px">${r.votes} vote${r.votes === 1 ? "" : "s"}</div>
+      </div>`).join("");
+    $("#xrefSheetList").querySelectorAll(".result").forEach((el) => {
+      el.addEventListener("click", () => {
+        const r = refs[parseInt(el.dataset.i, 10)];
+        const book = bookByName(r.toBook);
+        if (!book) return;
+        state.book = book; state.chapter = r.toChapter; state.verseFocus = r.toVerseStart;
+        $("#xrefSheetBackdrop").classList.remove("show");
+        setView("read");
+      });
+    });
+  }
+
+  /* =====================================================================
+     Backup & restore
+     ---------------------------------------------------------------------
+     Exports the irreplaceable, user-created data only: tabs, highlights,
+     notes, and the display name. Deliberately excludes downloaded
+     scripture text, Strong's, and cross-references — those are large and
+     re-downloadable, and including them would turn a small shareable file
+     into a hundred-megabyte one. Also excludes the AI API key, since a
+     backup file is likely to be emailed or synced somewhere.
+     Restore MERGES rather than replaces, so importing a backup on a device
+     that already has notes won't wipe them; on a conflict the imported
+     copy wins for that specific verse/tab.
+  ===================================================================== */
+  const BACKUP_FORMAT = 1;
+
+  async function buildBackupObject() {
+    const [highlights, notes] = await Promise.all([getAllHighlights(), getAllNotes()]);
+    return {
+      format: BACKUP_FORMAT,
+      app: "berea",
+      exportedAt: new Date().toISOString(),
+      name: localStorage.getItem("berea.name") || null,
+      tabs: loadTabs(),
+      highlights: highlights.map((h) => ({ ref: h.ref, color: h.color })),
+      notes: notes.map((n) => ({ ref: n.ref, text: n.text, updatedAt: n.updatedAt || null })),
+    };
+  }
+
+  async function exportBackup() {
+    const data = await buildBackupObject();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `berea-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return data;
+  }
+
+  async function restoreBackup(json) {
+    if (!json || json.app !== "berea" || !json.format) {
+      throw new Error("That doesn't look like a Berea backup file");
+    }
+    if (json.format > BACKUP_FORMAT) {
+      throw new Error("That backup was made by a newer version of the app");
+    }
+    let tabsAdded = 0, hlAdded = 0, notesAdded = 0;
+
+    if (Array.isArray(json.tabs)) {
+      const existing = loadTabs();
+      const byId = new Map(existing.map((t) => [t.id, t]));
+      for (const t of json.tabs) {
+        if (!t || !t.id || !Array.isArray(t.refs)) continue;
+        byId.set(t.id, t); // imported copy wins on conflict
+        tabsAdded++;
+      }
+      saveTabs(Array.from(byId.values()));
+    }
+
+    if (Array.isArray(json.highlights) && json.highlights.length) {
+      const db = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("highlights", "readwrite");
+        const store = tx.objectStore("highlights");
+        for (const h of json.highlights) {
+          if (!h || !h.ref || !h.color) continue;
+          store.put({ ref: h.ref, color: h.color });
+          hlAdded++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    if (Array.isArray(json.notes) && json.notes.length) {
+      const db = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("notes", "readwrite");
+        const store = tx.objectStore("notes");
+        for (const n of json.notes) {
+          if (!n || !n.ref || !n.text) continue;
+          store.put({ ref: n.ref, text: n.text, updatedAt: n.updatedAt || Date.now() });
+          notesAdded++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    if (json.name && !localStorage.getItem("berea.name")) {
+      localStorage.setItem("berea.name", json.name);
+    }
+
+    renderTabStrip();
+    return { tabsAdded, hlAdded, notesAdded };
+  }
+
+  async function renderBackupPanel() {
+    const wrap = $("#backupPanel");
+    if (!wrap) return;
+    const [highlights, notes] = await Promise.all([getAllHighlights(), getAllNotes()]);
+    const tabCount = loadTabs().length;
+    wrap.innerHTML = `
+      <div class="trcard">
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">Your study data</div>
+            <div class="trcard-status">${tabCount} tab${tabCount === 1 ? "" : "s"} \u00b7 ${highlights.length} highlight${highlights.length === 1 ? "" : "s"} \u00b7 ${notes.length} note${notes.length === 1 ? "" : "s"}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="dl" id="backupExportBtn" style="flex:1">Save backup</button>
+          <button class="dl" id="backupImportBtn" style="flex:1">Restore</button>
+        </div>
+        <input type="file" id="backupFileInput" accept="application/json,.json" style="display:none">
+      </div>
+    `;
+    $("#backupExportBtn").addEventListener("click", async () => {
+      try {
+        await exportBackup();
+        toast("Backup saved");
+      } catch (e) {
+        toast("Couldn't save the backup: " + (e && e.message ? e.message : "unknown error"));
+      }
+    });
+    $("#backupImportBtn").addEventListener("click", () => $("#backupFileInput").click());
+    $("#backupFileInput").addEventListener("change", async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const result = await restoreBackup(JSON.parse(text));
+        toast(`Restored ${result.tabsAdded} tabs, ${result.hlAdded} highlights, ${result.notesAdded} notes`);
+        renderBackupPanel();
+        if (state.view === "read") renderRead();
+      } catch (e) {
+        toast("Couldn't restore: " + (e && e.message ? e.message : "the file may be corrupted"));
+      }
+      ev.target.value = "";
     });
   }
 
@@ -1797,6 +2956,7 @@
     leaderId: null,
     isLeader: false,
     following: true,
+    shareMarkup: false,
     connections: new Map(),  // peerId -> DataConnection
     roster: new Map(),       // peerId -> { name }
   };
@@ -1914,7 +3074,31 @@
         }
         break;
       }
+      // Shared markup: only applied when this peer has sharing switched on,
+      // so someone reading along privately never has their own highlights
+      // or notes overwritten by the group.
+      case "highlight": {
+        if (!mesh.shareMarkup || !msg.ref) break;
+        setHighlight(msg.ref, msg.color || null).then(() => refreshCurrentMarkupView(msg.ref));
+        break;
+      }
+      case "note": {
+        if (!mesh.shareMarkup || !msg.ref) break;
+        setNote(msg.ref, msg.text || "").then(() => refreshCurrentMarkupView(msg.ref));
+        break;
+      }
     }
+  }
+
+  // Re-render only if the incoming change touches what's on screen, so a
+  // busy group doesn't cause constant redraws while you're reading elsewhere.
+  function refreshCurrentMarkupView(ref) {
+    const parts = String(ref).split("|");
+    if (parts.length < 2) return;
+    const sameChapter = parts[0] === state.book.name && parseInt(parts[1], 10) === state.chapter;
+    if (state.view === "read" && sameChapter) renderRead();
+    else if (state.view === "compare" && sameChapter) renderCompare();
+    else if (state.view === "tab" && state.activeTabId) openTab(state.activeTabId);
   }
 
   function maybeReclaimHost() {
@@ -2009,6 +3193,7 @@
     mesh.active = false; mesh.roomCode = null; mesh.peer = null;
     mesh.connections.clear(); mesh.roster.clear();
     mesh.leaderId = null; mesh.isLeader = false; mesh.isHost = false;
+    mesh.shareMarkup = false; // never carries over into the next session
     history.replaceState(null, "", location.pathname + location.search);
     renderStudyView();
   }
@@ -2026,6 +3211,10 @@
   }
   function broadcastTabAdd(tabObj) { if (mesh.active) meshBroadcast({ t: "tab-add", tab: tabObj }); }
   function broadcastTabUpdate(tabId, refs) { if (mesh.active) meshBroadcast({ t: "tab-update", tabId, refs }); }
+  // Notes/highlights sync is Pass 2 — these are the send-side hooks, wired
+  // in now so every save path already calls them. Receive handlers land next.
+  function broadcastNote(ref, text) { if (mesh.active && mesh.shareMarkup) meshBroadcast({ t: "note", ref, text }); }
+  function broadcastHighlight(ref, color) { if (mesh.active && mesh.shareMarkup) meshBroadcast({ t: "highlight", ref, color }); }
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden || !mesh.active || !mesh.peer) return;
@@ -2067,6 +3256,9 @@
         ? `<div class="hint">You're leading — your navigation moves everyone who's following along.</div>`
         : `<button class="dl" id="takeLeadBtn" style="width:100%;margin-bottom:10px">Take the lead</button>
            <label class="follow-row"><input type="checkbox" id="followToggle" ${mesh.following ? "checked" : ""}> Follow along automatically</label>`}
+      <label class="follow-row"><input type="checkbox" id="shareMarkupToggle" ${mesh.shareMarkup ? "checked" : ""}> Share highlights &amp; notes with the group</label>
+      <div class="hint" style="margin-bottom:10px">Off by default. When on, highlights and notes you make from now on are sent to everyone else who also has this on — and theirs are saved to your copy. Leave it off to read along and mark up privately.</div>
+      ${mesh.shareMarkup ? `<button class="dl" id="pushMarkupBtn" style="width:100%;margin-bottom:16px">Send my existing marks for ${escapeHtml(state.book.name)} ${state.chapter}</button>` : ""}
       <button class="leave-btn" id="leaveStudyBtn">Leave study</button>
     `;
     $("#copyLinkBtn").addEventListener("click", () => {
@@ -2077,6 +3269,30 @@
     });
     $("#takeLeadBtn")?.addEventListener("click", takeLead);
     $("#followToggle")?.addEventListener("change", (ev) => { mesh.following = ev.target.checked; });
+    $("#shareMarkupToggle").addEventListener("change", (ev) => {
+      mesh.shareMarkup = ev.target.checked;
+      toast(mesh.shareMarkup ? "Sharing highlights & notes" : "Highlights & notes are private again");
+      renderStudyView();
+    });
+    $("#pushMarkupBtn")?.addEventListener("click", async () => {
+      // Deliberate, bounded catch-up: sends only the current chapter, and
+      // only when the user asks. Auto-pushing everything on toggle could
+      // silently overwrite other people's marks on the same verses.
+      const [hl, notes] = await Promise.all([
+        getAllHighlightsForChapter(state.book.name, state.chapter),
+        getAllNotesForChapter(state.book.name, state.chapter),
+      ]);
+      let sent = 0;
+      for (const [verse, color] of Object.entries(hl)) {
+        meshBroadcast({ t: "highlight", ref: `${state.book.name}|${state.chapter}|${verse}`, color });
+        sent++;
+      }
+      for (const [verse, text] of Object.entries(notes)) {
+        meshBroadcast({ t: "note", ref: `${state.book.name}|${state.chapter}|${verse}`, text });
+        sent++;
+      }
+      toast(sent ? `Sent ${sent} mark${sent === 1 ? "" : "s"}` : "Nothing marked in this chapter yet");
+    });
     $("#leaveStudyBtn").addEventListener("click", () => { if (confirm("Leave this study?")) leaveStudy(); });
   }
 
@@ -2104,6 +3320,41 @@
   $("#aiCancelConfig").addEventListener("click", () => { aiConfigSavedCallback = null; closeAiConfigSheet(); });
   $("#aiConfigBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "aiConfigBackdrop") { aiConfigSavedCallback = null; closeAiConfigSheet(); } });
 
+  $("#aiCopyPromptBtn").addEventListener("click", () => {
+    const el = $("#aiPromptText");
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(el.value).then(() => toast("Prompt copied \u2014 paste it into your AI of choice"));
+    } else {
+      el.select();
+      toast("Prompt selected \u2014 copy it (Cmd/Ctrl+C)");
+    }
+  });
+  $("#aiImportBtn").addEventListener("click", () => {
+    const raw = $("#aiPasteInput").value;
+    if (!raw.trim()) { toast("Paste the AI's reply first."); return; }
+    try {
+      renderAiSuggestionsList(parseAiSuggestions(raw));
+    } catch (e) {
+      $("#aiSuggestStatus").textContent = "Couldn't read that as JSON: " + (e && e.message ? e.message : "unknown error") + ". Make sure you copied the AI's full reply.";
+      $("#aiSuggestList").innerHTML = "";
+    }
+  });
+  $("#aiUseDirectBtn").addEventListener("click", () => {
+    const seed = currentAiSeed;
+    if (!seed) return;
+    const doQuery = async () => {
+      $("#aiSuggestStatus").textContent = "Asking your connected AI\u2026";
+      $("#aiSuggestList").innerHTML = "";
+      try {
+        const refText = refLabel(seed.book, seed.chapter, seed.verseStart, seed.verseEnd);
+        renderAiSuggestionsList(await queryAiForCorrelations(refText, currentAiSeedText));
+      } catch (e) {
+        $("#aiSuggestStatus").textContent = "Couldn't get suggestions: " + (e && e.message ? e.message : "unknown error") + ". Check the API key in settings and try again.";
+      }
+    };
+    if (!getAiConfig()) openAiConfigSheet(doQuery);
+    else doQuery();
+  });
   $("#aiCreateTab").addEventListener("click", () => {
     const checked = $$("#aiSuggestList input[type=checkbox]:checked").map((el) => currentAiSuggestions[parseInt(el.dataset.i, 10)]);
     if (!checked.length) { toast("Select at least one suggestion."); return; }
@@ -2126,6 +3377,29 @@
   $("#aiSuggestClose").addEventListener("click", () => $("#aiSuggestBackdrop").classList.remove("show"));
   $("#aiSuggestBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "aiSuggestBackdrop") $("#aiSuggestBackdrop").classList.remove("show"); });
 
+  $("#xrefSheetClose").addEventListener("click", () => $("#xrefSheetBackdrop").classList.remove("show"));
+  $("#xrefSheetBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "xrefSheetBackdrop") $("#xrefSheetBackdrop").classList.remove("show"); });
+
+  $("#strongsEntryClose").addEventListener("click", () => $("#strongsEntryBackdrop").classList.remove("show"));
+  $("#strongsEntryBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "strongsEntryBackdrop") $("#strongsEntryBackdrop").classList.remove("show"); });
+
+  $("#strongsSearchForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const q = $("#strongsSearchInput").value;
+    const meta = await Promise.all([getMeta("strongs-hebrew"), getMeta("strongs-greek")]);
+    if (!meta[0] && !meta[1]) {
+      $("#strongsResults").innerHTML = `<div class="hint">Download the Hebrew or Greek dictionary above first.</div>`;
+      return;
+    }
+    renderStrongsSearchResults(await searchStrongsDict(q));
+  });
+
+  $("#strongsModeBtn").addEventListener("click", () => {
+    state.strongsMode = !state.strongsMode;
+    $("#strongsModeBtn").classList.toggle("on", state.strongsMode);
+    renderRead();
+  });
+
   $("#trBadge").innerHTML = TR_ORDER.map((t) => `<option value="${t}">${t}</option>`).join("");
   $("#trBadge").addEventListener("change", (ev) => {
     state.readTr = ev.target.value;
@@ -2145,6 +3419,29 @@
     runTabSearch($("#tabSearchInput").value);
   });
   $("#tabSearchInput").addEventListener("input", () => runTabSearch($("#tabSearchInput").value));
+  $("#topicSearchForm").addEventListener("submit", (ev) => { ev.preventDefault(); runTopicSearch($("#topicSearchInput").value); });
+  $("#topicSearchInput").addEventListener("input", () => runTopicSearch($("#topicSearchInput").value));
+  $("#topicSheetClose").addEventListener("click", () => $("#topicSheetBackdrop").classList.remove("show"));
+  $("#topicSheetBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "topicSheetBackdrop") $("#topicSheetBackdrop").classList.remove("show"); });
+  $("#topicSaveTab").addEventListener("click", () => {
+    if (!currentTopic) return;
+    const label = prompt("Label for this tab?", currentTopic.topic);
+    if (!label) return;
+    // Flatten every subtopic's references into one tab, capped so a huge
+    // topic like "Jesus Christ" doesn't create an unreadable tab.
+    const refs = [];
+    for (const st of currentTopic.subtopics) {
+      for (const r of st.refs) { if (refs.length < 24) refs.push(r); }
+    }
+    const tabs = loadTabs();
+    const newTab = { id: "t_" + Date.now(), label, translationId: state.readTr, refs };
+    tabs.push(newTab);
+    saveTabs(tabs);
+    renderTabStrip();
+    broadcastTabAdd(newTab);
+    $("#topicSheetBackdrop").classList.remove("show");
+    toast(refs.length >= 24 ? "Tab created (first 24 references)" : "Tab created");
+  });
   $$("#searchModeToggle button").forEach((btn) => {
     btn.addEventListener("click", () => setSearchMode(btn.dataset.mode));
   });
