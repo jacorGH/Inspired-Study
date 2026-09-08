@@ -225,13 +225,22 @@
   }
   .outline-block {
     position: relative; border: 1px solid var(--line); border-radius: 9px;
-    padding: 10px 62px 10px 12px; margin-bottom: 8px; background: var(--panel);
+    padding: 10px 84px 10px 12px; margin-bottom: 8px; background: var(--panel);
   }
   .outline-heading { background: var(--page-dim); border-color: var(--gilt-soft); }
   .outline-verse { border-left: 3px solid var(--gilt); }
   .outline-question { border-left: 3px solid var(--cover-light); background: var(--page-dim); }
-  .outline-block[data-edit] { cursor: pointer; }
-  .outline-block[data-edit]:active { background: var(--gilt-soft); }
+  [data-edit] { cursor: pointer; border-radius: 5px; }
+  [data-edit]:active { background: var(--gilt-soft); }
+  .outline-answer {
+    margin-top: 8px; padding: 7px 10px; border-left: 2px solid var(--gilt-soft);
+    background: var(--panel); font-size: 13.5px; color: var(--ink); cursor: pointer; border-radius: 4px;
+  }
+  .outline-answer:active { background: var(--gilt-soft); }
+  .outline-add-answer {
+    display: block; margin-top: 6px; font-family: var(--font-ui); font-size: 12px; font-weight: 600;
+    color: var(--cover); background: none; border: none; padding: 2px 0;
+  }
   .outline-controls {
     position: absolute; right: 6px; top: 6px; display: flex; gap: 2px;
   }
@@ -912,6 +921,21 @@
     <div class="sheet-actions" style="margin-top:10px">
       <button class="primary" id="recapCopyBtn">Copy recap</button>
       <button class="ghost" id="recapCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Outline block type picker (used for both "add at end" and "insert after") -->
+<div id="outlineInsertBackdrop" class="sheet-backdrop">
+  <div class="sheet">
+    <div class="sheet-ref">Add a block</div>
+    <div class="sheet-actions">
+      <button data-instype="heading">Heading</button>
+      <button data-instype="text">Text</button>
+      <button data-instype="point">Point</button>
+      <button data-instype="question">Question</button>
+      <button data-instype="verse">Verse</button>
+      <button class="ghost" id="outlineInsertCancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -3748,7 +3772,10 @@
       if (b.type === "heading") lines.push("", b.text.toUpperCase(), "-".repeat(b.text.length));
       else if (b.type === "text") lines.push("", b.text);
       else if (b.type === "point") lines.push("  \u2022 " + b.text);
-      else if (b.type === "question") lines.push("  ? " + b.text);
+      else if (b.type === "question") {
+        lines.push("  ? " + b.text);
+        if (b.answer) lines.push("    \u2192 " + b.answer);
+      }
       else if (b.type === "verse") {
         lines.push("", `  ${refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd)} (${b.translationId})`,
           "  \u201c" + b.text + "\u201d");
@@ -3765,9 +3792,12 @@
   function outlineToJson(outline) {
     return JSON.stringify({
       title: outline.title,
-      blocks: outline.blocks.map((b) => b.type === "verse"
-        ? { type: "verse", reference: refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd) }
-        : { type: b.type, text: b.text }),
+      blocks: outline.blocks.map((b) => {
+        if (b.type === "verse") return { type: "verse", reference: refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd) };
+        const out = { type: b.type, text: b.text };
+        if (b.type === "question" && b.answer) out.answer = b.answer;
+        return out;
+      }),
     }, null, 2);
   }
 
@@ -3786,7 +3816,7 @@ Produce a thorough, well-organized study outline as ONLY valid JSON, no markdown
   {"type":"heading","text":"Section title"},
   {"type":"text","text":"Explanatory prose, a theme statement, or a closing thought"},
   {"type":"point","text":"A teaching point"},
-  {"type":"question","text":"A discussion question"},
+  {"type":"question","text":"A discussion question","answer":"A suggested answer or talking points \u2014 optional, omit if you'd rather leave it for the group to work out"},
   {"type":"verse","reference":"Book Chapter:Verse"}
 ]}
 Use "type" values only from: heading, text, point, question, verse. For "verse" blocks give ONLY the reference in the "reference" field \u2014 do not include the verse's wording, since the app looks up the actual text itself from its own Bible data. If converting an existing outline, preserve its structure and content rather than summarizing it. If building one from a topic, include several sections, each with teaching points, at least one verse, and a couple of discussion questions.
@@ -3830,7 +3860,9 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
           text });
       } else {
         if (typeof b.text !== "string" || !b.text.trim()) { skippedOther++; continue; }
-        blocks.push({ id: "b_" + Date.now() + "_" + blocks.length, type: b.type, text: b.text.trim() });
+        const block = { id: "b_" + Date.now() + "_" + blocks.length, type: b.type, text: b.text.trim() };
+        if (b.type === "question" && typeof b.answer === "string" && b.answer.trim()) block.answer = b.answer.trim();
+        blocks.push(block);
       }
     }
     return { blocks, skippedRefs, skippedOther };
@@ -3882,6 +3914,57 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     return copy;
   }
 
+  // Inserts a new block right after `afterIndex` (or at the very start if
+  // afterIndex is -1, or at the end if afterIndex is null/omitted) rather
+  // than only ever appending -- splicing a heading or question in partway
+  // through an outline shouldn't require walking it up one arrow-tap at a
+  // time from the bottom.
+  function insertBlock(blocks, afterIndex, block) {
+    const copy = blocks.slice();
+    const at = (afterIndex === null || afterIndex === undefined) ? copy.length : afterIndex + 1;
+    copy.splice(at, 0, block);
+    return copy;
+  }
+
+  // Module-level (not function-local) since the type-picker sheet is
+  // static HTML wired once in the Wiring section, not regenerated per
+  // render -- its handler needs to read the CURRENT outline and insert
+  // position at click-time, not a stale closure from whichever render
+  // happened to be active when it was (mistakenly, in an earlier pass)
+  // wired inside renderOutlineEditor itself. Re-fetching the outline fresh
+  // here rather than capturing it also means this is safe to call no
+  // matter how many edits happened since the sheet was opened.
+  let outlineInsertAfterIndex = null; // null = append at the end
+
+  async function promptAndInsertBlock(type, afterIndex) {
+    const outline = await getOutline(state.outlineEditingId);
+    if (!outline) return;
+    if (type === "verse") {
+      const raw = prompt('Reference? (e.g. "Romans 8:28")');
+      if (!raw) return;
+      const parsed = parseReference(raw);
+      if (!parsed) { toast("Couldn't understand that reference."); return; }
+      let text = "(couldn't load text)";
+      try {
+        const rows = await getChapterVerses(state.readTr, parsed.book, parsed.chapter);
+        const vs = parsed.verseStart ? rows.filter((r) => r.verse >= parsed.verseStart && r.verse <= parsed.verseEnd) : rows;
+        text = vs.map((r) => r.text).join(" ") || text;
+      } catch (e) { /* keep placeholder */ }
+      const block = { id: "b_" + Date.now(), type: "verse", translationId: state.readTr,
+        ref: { book: parsed.book.name, chapter: parsed.chapter, verseStart: parsed.verseStart || 1, verseEnd: parsed.verseEnd || 1 },
+        text };
+      outline.blocks = insertBlock(outline.blocks, afterIndex, block);
+    } else {
+      const labels = { heading: "Heading text?", text: "Text? (a theme statement, explanation, or closing thought)",
+        point: "Point text?", question: "Discussion question?" };
+      const t = prompt(labels[type] || "Text?");
+      if (!t) return;
+      outline.blocks = insertBlock(outline.blocks, afterIndex, { id: "b_" + Date.now(), type, text: t });
+    }
+    await saveOutline(outline);
+    if (state.outlineEditingId === outline.id) renderOutlineEditor();
+  }
+
   async function renderOutlineEditor() {
     const wrap = $("#journalBody");
     if (!wrap) return;
@@ -3893,12 +3976,18 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         <div class="outline-controls">
           <button data-move="up" data-i="${i}" ${i === 0 ? "disabled" : ""}>\u2191</button>
           <button data-move="down" data-i="${i}" ${i === outline.blocks.length - 1 ? "disabled" : ""}>\u2193</button>
+          <button data-insert-after="${i}" title="Insert a block after this one">+</button>
           <button data-del="${i}">\u00d7</button>
         </div>`;
-      if (b.type === "heading") return `<div class="outline-block outline-heading" data-edit="${i}">${controls}<div class="testament-label" style="margin:0">${escapeHtml(b.text)}</div></div>`;
-      if (b.type === "text") return `<div class="outline-block" data-edit="${i}">${controls}<div style="font-size:14px;line-height:1.55">${escapeHtml(b.text)}</div></div>`;
-      if (b.type === "point") return `<div class="outline-block outline-point" data-edit="${i}">${controls}<div>\u2022 ${escapeHtml(b.text)}</div></div>`;
-      if (b.type === "question") return `<div class="outline-block outline-question" data-edit="${i}">${controls}<div style="font-style:italic;color:var(--ink-soft)">? ${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "heading") return `<div class="outline-block outline-heading">${controls}<div class="testament-label" style="margin:0" data-edit="${i}">${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "text") return `<div class="outline-block">${controls}<div style="font-size:14px;line-height:1.55" data-edit="${i}">${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "point") return `<div class="outline-block outline-point">${controls}<div data-edit="${i}">\u2022 ${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "question") {
+        const answerHtml = b.answer
+          ? `<div class="outline-answer" data-edit-answer="${i}">${escapeHtml(b.answer)}</div>`
+          : `<button class="outline-add-answer" data-add-answer="${i}">+ Add answer / notes</button>`;
+        return `<div class="outline-block outline-question">${controls}<div style="font-style:italic;color:var(--ink-soft)" data-edit="${i}">? ${escapeHtml(b.text)}</div>${answerHtml}</div>`;
+      }
       return `<div class="outline-block outline-verse">${controls}<div class="page-title" style="margin:0 0 4px">${escapeHtml(refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd))}</div><div style="font-size:14px;color:var(--ink-soft)">${escapeHtml(b.text)}</div></div>`;
     };
 
@@ -3906,15 +3995,8 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       <button id="outlineBackBtn" style="background:none;border:none;color:var(--cover);font-family:var(--font-ui);font-size:13px;font-weight:600;padding:0 0 12px">\u2039 All outlines</button>
       <div class="trcard-name" style="font-size:19px;margin-bottom:14px" id="outlineTitleDisplay">${escapeHtml(outline.title)}</div>
       ${outline.blocks.length ? outline.blocks.map(blockHtml).join("") : `<div class="hint">Empty so far. Add a block below, or import one from an AI.</div>`}
-      <div style="display:flex;gap:6px;margin:14px 0 6px">
-        <button class="dl" id="outlineAddHeading" style="flex:1;font-size:12.5px">+ Heading</button>
-        <button class="dl" id="outlineAddText" style="flex:1;font-size:12.5px">+ Text</button>
-      </div>
-      <div style="display:flex;gap:6px;margin-bottom:14px">
-        <button class="dl" id="outlineAddPoint" style="flex:1;font-size:12.5px">+ Point</button>
-        <button class="dl" id="outlineAddQuestion" style="flex:1;font-size:12.5px">+ Question</button>
-        <button class="dl" id="outlineAddVerse" style="flex:1;font-size:12.5px">+ Verse</button>
-      </div>
+      <button class="dl" id="outlineAddEndBtn" style="width:100%;margin:6px 0 14px">+ Add a block</button>
+      ${mesh.active ? `<button class="dl" id="outlineShareBtn" style="width:100%;margin-bottom:8px">\u{1F465} Share with study group</button>` : ""}
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <button class="dl" id="outlineCopyBtn" style="flex:1">Copy as text</button>
         <button class="dl" id="outlineCopyJsonBtn" style="flex:1">Copy as JSON</button>
@@ -3930,40 +4012,20 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     });
     $("#outlineBackBtn").addEventListener("click", () => { state.outlineEditingId = null; renderOutlineListView(); });
 
-    const addSimpleBlock = (btnId, type, promptText) => {
-      $(btnId).addEventListener("click", async () => {
-        const t = prompt(promptText);
-        if (!t) return;
-        outline.blocks.push({ id: "b_" + Date.now(), type, text: t });
-        await saveOutline(outline); renderOutlineEditor();
+    $("#outlineAddEndBtn").addEventListener("click", () => { outlineInsertAfterIndex = null; $("#outlineInsertBackdrop").classList.add("show"); });
+    wrap.querySelectorAll("[data-insert-after]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        outlineInsertAfterIndex = parseInt(btn.dataset.insertAfter, 10);
+        $("#outlineInsertBackdrop").classList.add("show");
       });
-    };
-    addSimpleBlock("#outlineAddHeading", "heading", "Heading text?");
-    addSimpleBlock("#outlineAddText", "text", "Text? (a theme statement, explanation, or closing thought)");
-    addSimpleBlock("#outlineAddPoint", "point", "Point text?");
-    addSimpleBlock("#outlineAddQuestion", "question", "Discussion question?");
-
-    $("#outlineAddVerse").addEventListener("click", async () => {
-      const raw = prompt('Reference? (e.g. "Romans 8:28")');
-      if (!raw) return;
-      const parsed = parseReference(raw);
-      if (!parsed) { toast("Couldn't understand that reference."); return; }
-      try {
-        const rows = await getChapterVerses(state.readTr, parsed.book, parsed.chapter);
-        const vs = parsed.verseStart
-          ? rows.filter((r) => r.verse >= parsed.verseStart && r.verse <= parsed.verseEnd)
-          : rows;
-        const text = vs.map((r) => r.text).join(" ") || "(text unavailable)";
-        outline.blocks.push({ id: "b_" + Date.now(), type: "verse", translationId: state.readTr,
-          ref: { book: parsed.book.name, chapter: parsed.chapter, verseStart: parsed.verseStart || 1, verseEnd: parsed.verseEnd || 1 },
-          text });
-      } catch (e) {
-        outline.blocks.push({ id: "b_" + Date.now(), type: "verse", translationId: state.readTr,
-          ref: { book: parsed.book.name, chapter: parsed.chapter, verseStart: parsed.verseStart || 1, verseEnd: parsed.verseEnd || 1 },
-          text: "(couldn't load text)" });
-      }
-      await saveOutline(outline); renderOutlineEditor();
     });
+
+    $("#outlineShareBtn")?.addEventListener("click", () => {
+      broadcastOutlineShare(outline);
+      toast("Shared with the study group");
+    });
+
     wrap.querySelectorAll("[data-move]").forEach((btn) => {
       btn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
@@ -3975,6 +4037,27 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       btn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
         outline.blocks.splice(parseInt(btn.dataset.del, 10), 1);
+        await saveOutline(outline); renderOutlineEditor();
+      });
+    });
+    wrap.querySelectorAll("[data-add-answer]").forEach((btn) => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const i = parseInt(btn.dataset.addAnswer, 10);
+        const a = prompt("Answer or notes for this question?");
+        if (!a || !a.trim()) return;
+        outline.blocks[i].answer = a.trim();
+        await saveOutline(outline); renderOutlineEditor();
+      });
+    });
+    wrap.querySelectorAll("[data-edit-answer]").forEach((el) => {
+      el.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const i = parseInt(el.dataset.editAnswer, 10);
+        const b = outline.blocks[i];
+        const a = prompt("Edit the answer / notes (clear the text to remove it):", b.answer);
+        if (a === null) return;
+        if (!a.trim()) delete b.answer; else b.answer = a.trim();
         await saveOutline(outline); renderOutlineEditor();
       });
     });
@@ -4600,9 +4683,10 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       <p>Search only covers text stored on your device, so downloading a translation makes it far more useful.</p>` },
 
     { id: "h-study", title: "Study sessions — reading together", body: `
-      <p>The <strong>Study</strong> tab starts a shared session. Tap <em>Start a Study</em>, then send the link over any messaging app — whoever opens it joins straight away, no code to type.</p>
+      <p>The <strong>Study</strong> tab starts a shared session. Tap <em>Start a Study</em>, then send the link over any messaging app — whoever opens it joins straight away, no code to type. First-time guests are asked for a name right there in the app before joining; the room's roster (everyone connected) shows at the top of the Study tab once you're in.</p>
       <p><strong>Leading:</strong> whoever leads moves the group through the passage. Anyone can tap <em>Take the lead</em>, and anyone can switch off <em>Follow along</em> to wander on their own.</p>
       <p><strong>Sharing marks</strong> is off by default. Switch it on and your highlights and notes go to everyone else who also has it on, and theirs come to you. Leave it off to mark up privately. If you turn it on mid-study, <em>Send my existing marks</em> catches the group up on the current chapter.</p>
+      <p><strong>Sharing an outline</strong> — open it under Journal › Outlines while in a session and tap <em>Share with study group</em>; it appears in everyone's own Outlines list. Sharing again after further edits updates their copy.</p>
       <p>Everyone connects directly to everyone else, so the session keeps going even if the person who started it closes their tab. Reopening the same link rejoins.</p>
       <p>When you leave, if the group covered any ground, you'll get a <strong>recap</strong> \u2014 passages visited and tabs pinned during the session, ready to copy and share. It's yours alone; each person's recap reflects what they had open, and it's never sent to anyone automatically.</p>` },
 
@@ -4611,7 +4695,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       <p><strong>Prayer</strong> \u2014 add a request in a line of text. Tap it to add detail, note that you prayed for it, set a category, or mark it answered. Requests you haven't prayed for in a while drift to the top, so nothing quietly falls off the list. Answered prayers get their own section with how long you carried each one, plus room to write down what happened \u2014 it's genuinely easy to forget what's already been answered. <em>Pray now</em> runs a simple timer and logs the minutes. There are no streaks or targets here on purpose: streaks suit a daily habit, but attached to prayer they'd turn it into score-keeping, and a broken streak becomes guilt about praying.</p>
       <p><strong>Plan</strong> \u2014 pick a reading plan (Whole Bible in a year, New Testament in 90 days, the Gospels in a month, and others) and it shows you today's assignment, one tap from the reading itself. This is where streaks belong \u2014 a daily-habit goal is exactly what they're for.</p>
       <p><strong>Memory</strong> \u2014 verses you've chosen to memorize (add one from any verse's menu while reading) come up for review on a spaced schedule: sooner after you add them, further apart each time you get one right. Practice shows the verse with a growing share of words blanked out as you review it more.</p>
-      <p><strong>Outlines</strong> \u2014 build a document mixing headings, plain text, teaching points, discussion questions, and verses, in whatever order you'll actually use it \u2014 teaching, leading a study, or thinking a passage through. Tap a block to edit it, reorder with the arrows, and copy the whole thing as text or JSON when you're ready to use it elsewhere.</p>
+      <p><strong>Outlines</strong> \u2014 build a document mixing headings, plain text, teaching points, discussion questions, and verses, in whatever order you'll actually use it \u2014 teaching, leading a study, or thinking a passage through. Tap a block to edit it, tap <strong>+</strong> on any block to insert a new one right after it (not just at the end), reorder with the arrows, and copy the whole thing as text or JSON when you're ready to use it elsewhere. Discussion questions can carry their own answer or notes \u2014 tap <em>+ Add answer</em> underneath one. During a study session, a <strong>Share with study group</strong> button sends the whole outline to everyone connected; sharing again after further edits updates their copy.</p>
       <p><strong>\u2726 Import from AI</strong> builds a prompt from a topic you give it, or from an existing outline you already have (paste one in from ChatGPT or anywhere else) \u2014 copy the prompt into any AI, paste its JSON reply back, and it becomes a real outline you can keep editing. The AI supplies structure and its own words; verse text always comes from the app's own Bible data, never from the AI, so nothing scriptural is ever hallucinated.</p>
       <p>All of it stays on your device, and prayers, memory verses, and outlines are included in your backup file.</p>` },
 
@@ -4760,6 +4844,9 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     shareMarkup: false,
     connections: new Map(),  // peerId -> DataConnection
     roster: new Map(),       // peerId -> { name }
+    pendingAutoJoinCode: null, // set when a #study= link opened but a name
+                               // is needed before joining can safely start
+    joinStatus: null,          // user-visible progress while connecting
   };
 
   /* ---------------------------------------------------------------------
@@ -4930,6 +5017,20 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         }
         break;
       }
+      case "outline-share": {
+        if (!msg.outline || !msg.outline.id || !Array.isArray(msg.outline.blocks)) break;
+        // A shared outline overwrites any existing local copy with the same
+        // id, so re-sharing after further edits updates the group's copy
+        // rather than sitting alongside a stale duplicate.
+        saveOutline(msg.outline).then(() => {
+          toast(`Received "${msg.outline.title}" from the study`);
+          if (state.journalMode === "outline") {
+            if (state.outlineEditingId === msg.outline.id) renderOutlineEditor();
+            else if (!state.outlineEditingId) renderOutlineListView();
+          }
+        });
+        break;
+      }
       // Shared markup: only applied when this peer has sharing switched on,
       // so someone reading along privately never has their own highlights
       // or notes overwritten by the group.
@@ -4982,7 +5083,10 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
 
   function initPeer(id) {
     return new Promise((resolve, reject) => {
-      const p = new Peer(id);
+      // Called with zero arguments (not just id === undefined) when no
+      // fixed id is wanted, in case PeerJS ever checks arguments.length
+      // rather than the value -- removes any ambiguity either way.
+      const p = id ? new Peer(id) : new Peer();
       let settled = false;
       p.on("open", (realId) => { if (!settled) { settled = true; resolve({ peer: p, id: realId }); } });
       p.on("error", (err) => { if (!settled) { settled = true; reject(err); } });
@@ -5023,9 +5127,15 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     if (code.length < 4) { toast("Enter the study's 6-letter code."); return; }
     const name = getMyName();
     mesh.roomCode = code; mesh.myName = name;
+    // Visible immediately, before the (possibly slow) broker round trip --
+    // so a guest opening a link always sees SOMETHING happen rather than a
+    // blank screen while this resolves.
+    mesh.joinStatus = `Joining ${code}\u2026`;
+    renderStudyView();
     try {
       const { peer, id } = await initPeer(undefined);
       mesh.peer = peer; mesh.myId = id; mesh.isHost = false; mesh.active = true; mesh.following = true;
+      mesh.joinStatus = null;
       wirePeerEvents();
       const hostId = hostPeerId(code);
       mesh.leaderId = hostId; // provisional, refined once a roster reply arrives
@@ -5037,11 +5147,22 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         conn.send({ t: "hello", id: mesh.myId, name: mesh.myName });
       });
       conn.on("error", () => { if (!responded) toast("Couldn't find that study — check the code and try again."); });
+      // If the handshake with the host never completes, say so plainly
+      // instead of leaving an empty roster with no explanation -- a silent
+      // stall here is exactly what "nothing on the guest's screen" looks
+      // like from the outside.
+      setTimeout(() => {
+        if (mesh.active && mesh.roomCode === code && mesh.connections.size === 0) {
+          toast("Still trying to reach the study — check both devices have a connection.");
+        }
+      }, 12000);
       location.hash = "study=" + code;
       sessionLogStart();
       renderStudyView();
     } catch (e) {
+      mesh.joinStatus = null;
       toast("Couldn't join the study — check your connection and try again.");
+      renderStudyView();
     }
   }
 
@@ -5058,6 +5179,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     mesh.connections.clear(); mesh.roster.clear();
     mesh.leaderId = null; mesh.isLeader = false; mesh.isHost = false;
     mesh.shareMarkup = false; // never carries over into the next session
+    mesh.pendingAutoJoinCode = null; mesh.joinStatus = null;
     sessionLog.startedAt = null;
     history.replaceState(null, "", location.pathname + location.search);
     renderStudyView();
@@ -5089,6 +5211,14 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     sessionLogTab(tabObj);
   }
   function broadcastTabUpdate(tabId, refs) { if (mesh.active) meshBroadcast({ t: "tab-update", tabId, refs }); }
+  // Explicit, one-shot share rather than continuous auto-sync of every
+  // edit -- an outline is built up incrementally over many small edits,
+  // unlike a tab which is usually complete the moment it's created, so
+  // broadcasting on every keystroke-equivalent would be noisy. Re-sharing
+  // after further changes just overwrites the group's copy (see the
+  // "outline-share" receive handler), so there's a clear, deliberate way
+  // to push updates without needing a separate "update" message type.
+  function broadcastOutlineShare(outline) { if (mesh.active) meshBroadcast({ t: "outline-share", outline }); }
   // Notes/highlights sync is Pass 2 — these are the send-side hooks, wired
   // in now so every save path already calls them. Receive handlers land next.
   function broadcastNote(ref, text) { if (mesh.active && mesh.shareMarkup) meshBroadcast({ t: "note", ref, text }); }
@@ -5104,6 +5234,30 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     const wrap = $("#studyBody");
     if (!wrap) return;
     if (!mesh.active) {
+      if (mesh.pendingAutoJoinCode) {
+        // Reached via a shared link, no name on file yet. A real button tap
+        // here (rather than a prompt() fired from a timer) is what makes
+        // this reliable across browsers.
+        wrap.innerHTML = `
+          <div class="hint">You've been invited to a study \u2014 code <strong>${escapeHtml(mesh.pendingAutoJoinCode)}</strong>. What name should the group see?</div>
+          <input id="autoJoinNameInput" class="code-input" type="text" placeholder="Your name" style="text-transform:none;margin-bottom:10px" autocomplete="off">
+          <button class="dl" id="autoJoinBtn" style="width:100%">Join study</button>
+        `;
+        $("#autoJoinNameInput").focus();
+        $("#autoJoinBtn").addEventListener("click", () => {
+          const name = $("#autoJoinNameInput").value.trim() || "Guest";
+          localStorage.setItem("berea.name", name);
+          const code = mesh.pendingAutoJoinCode;
+          mesh.pendingAutoJoinCode = null;
+          joinStudy(code);
+        });
+        $("#autoJoinNameInput").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("#autoJoinBtn").click(); });
+        return;
+      }
+      if (mesh.joinStatus) {
+        wrap.innerHTML = `<div class="hint">${escapeHtml(mesh.joinStatus)}</div>`;
+        return;
+      }
       wrap.innerHTML = `
         <div class="hint">Start a study to read together in real time. Everyone stays in sync as the leader moves through a passage, and the group keeps going even if whoever started it drops off.</div>
         <button class="dl" id="startStudyBtn" style="width:100%;margin-bottom:18px">Start a Study</button>
@@ -5368,6 +5522,18 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     if (ev.target.id === "outlineImportBackdrop") $("#outlineImportBackdrop").classList.remove("show");
   });
 
+  /* ---- outline block type picker (static sheet, wired once) ---- */
+  $$("#outlineInsertBackdrop [data-instype]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      $("#outlineInsertBackdrop").classList.remove("show");
+      promptAndInsertBlock(btn.dataset.instype, outlineInsertAfterIndex);
+    });
+  });
+  $("#outlineInsertCancel").addEventListener("click", () => $("#outlineInsertBackdrop").classList.remove("show"));
+  $("#outlineInsertBackdrop").addEventListener("click", (ev) => {
+    if (ev.target.id === "outlineInsertBackdrop") $("#outlineInsertBackdrop").classList.remove("show");
+  });
+
   $("#recapBackdrop").addEventListener("click", (ev) => {
     if (ev.target.id === "recapBackdrop") $("#recapBackdrop").classList.remove("show");
   });
@@ -5532,8 +5698,22 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     maybeShowFirstRunHint();
     const m = location.hash.match(/study=([A-Za-z0-9]+)/);
     if (m) {
+      const code = m[1].toUpperCase();
       setView("study");
-      setTimeout(() => joinStudy(m[1]), 250);
+      $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "study"));
+      if (localStorage.getItem("berea.name")) {
+        // A name is already known, so joinStudy() won't need to prompt for
+        // one -- safe to start immediately with no user gesture involved.
+        joinStudy(code);
+      } else {
+        // Getting a name requires asking, and a bare prompt() triggered
+        // from a setTimeout (not a direct tap) is exactly the case mobile
+        // Safari and other browsers are known to silently block dialogs
+        // for -- no error, nothing shown, the join just never happens.
+        // Ask inline in the Study view instead, so it's a real tap.
+        mesh.pendingAutoJoinCode = code;
+        renderStudyView();
+      }
     }
   }
   boot();
