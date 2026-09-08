@@ -3041,8 +3041,13 @@
   // generated "JSON" reliably breaks in a handful of specific, well-known
   // ways -- none of them content problems, all of them the model drifting
   // toward "JavaScript-ish" instead of strict JSON:
-  //   - curly/smart quotes (\u201c \u201d) where a straight one was needed,
-  //     as the actual JSON delimiters or as an unescaped quote inside text
+  //   - curly/smart quotes (\u201c \u201d) used as the actual JSON
+  //     delimiters, AND/OR reused for a quotation nested inside a string's
+  //     own prose ("...means \u201cGod with us,\u201d establishing...") --
+  //     both problems at once is the common case, since the AI typically
+  //     uses one curly-quote character for every quotation mark regardless
+  //     of purpose, which makes a delimiter and a nested quote impossible
+  //     to tell apart by character identity alone
   //   - a trailing comma before a closing } or ]
   //   - object keys left unquoted, JS-object-literal style ({title: "x"})
   // Plain JSON.parse rejects all of these outright with an unhelpful
@@ -3060,8 +3065,49 @@
   // Repairs are applied progressively (each stacked on top of the last)
   // rather than tried in isolation, since real AI output often has more
   // than one of these problems in the same reply.
+
+  // Resolves the delimiter-vs-nested-content ambiguity structurally rather
+  // than by a blind find-and-replace: whether a quote closes a string is
+  // decided by what comes right after it (skipping whitespace). A
+  // JSON-structural character (: , } ]) means "this really is the end of
+  // the string"; anything else -- a letter starting the next word,
+  // punctuation mid-sentence -- means "this was quoted content," so it gets
+  // escaped instead of closing the string early. Not a perfect heuristic
+  // (a nested quotation immediately followed by a comma that sits OUTSIDE
+  // the quote marks, rather than inside them, can still be misread as a
+  // true closer), but it resolves the overwhelmingly common case, including
+  // a full quoted clause in the middle of a sentence.
+  function smartRequote(text) {
+    const QUOTE = new Set(['"', "\u201C", "\u201D"]);
+    let out = "", inString = false, escapeNext = false;
+    const n = text.length;
+    for (let i = 0; i < n; i++) {
+      const ch = text[i];
+      if (!inString) {
+        if (QUOTE.has(ch)) { inString = true; out += '"'; }
+        else out += ch;
+        continue;
+      }
+      if (escapeNext) { out += ch; escapeNext = false; continue; }
+      if (ch === "\\") { out += ch; escapeNext = true; continue; }
+      if (QUOTE.has(ch)) {
+        let j = i + 1;
+        while (j < n && /\s/.test(text[j])) j++;
+        const after = j < n ? text[j] : "";
+        if (after === ":" || after === "," || after === "}" || after === "]" || j >= n) {
+          inString = false; out += '"';
+        } else {
+          out += '\\"';
+        }
+        continue;
+      }
+      out += ch;
+    }
+    return out;
+  }
+
   const JSON_REPAIRS = [
-    (s) => s.replace(/[\u201C\u201D]/g, '"'),                            // curly double quotes -> straight
+    smartRequote,                                                        // quote delimiters + nested content
     (s) => s.replace(/,(\s*[}\]])/g, "$1"),                              // trailing comma before } or ]
     (s) => s.replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g, '$1"$2"$3'),  // unquoted keys -> quoted
   ];
@@ -3072,8 +3118,8 @@
 
     // Ladder of attempts against one candidate string: raw, then each
     // repair stacked on top of the previous, so combinations of problems
-    // (e.g. curly quotes AND a trailing comma in the same reply) get fixed
-    // together rather than each repair only being tried alone.
+    // (e.g. nested curly quotes AND a trailing comma in the same reply)
+    // get fixed together rather than each repair only being tried alone.
     function ladder(candidate) {
       let working = candidate;
       let data = tryParse(working);
