@@ -103,6 +103,8 @@ Tabs sit in the strip above the bottom bar. Tap to open, **+ tab** to create one
 
 Inside an open tab, **+ Add a cross-reference passage** accepts plain references — `Romans 8:38-39`, `ps 22`, `1 cor 13:4-7`, `jn 3:16` all parse. Single-chapter books resolve sensibly too: `2 John 5` means chapter 1, verse 5.
 
+The facing-page look holds for **two** passages. Add a third and the tab switches to a vertical list instead — the book-spread metaphor stops being readable once there's more to swipe through than fits in one glance, and nothing on screen would hint that more passages exist off to the side.
+
 ### Search
 
 Four modes:
@@ -143,7 +145,11 @@ There are **no streaks on prayer, on purpose.** Streaks suit a daily-habit goal;
 
 **Memory** — verses added from the Read view's menu come up for review on a spaced schedule (a simplified SM-2): sooner after adding, further apart each time you get one right, faster again if you slip. Practice shows the reference first, then reveals the verse with a growing share of words blanked out as your review count rises.
 
-**Outlines** — build a small document mixing your own headings and points with verses, in whatever order you'll actually use it: teaching, leading a study, or thinking a passage through. Add blocks, reorder with the ↑↓ arrows, and **Copy as text** when you're ready to use it elsewhere. Verse text is captured at the moment you add it, so it won't shift under you later if you switch translations.
+**Outlines** — build a document mixing headings, plain text, teaching points, discussion questions, and verses, in whatever order you'll actually use it: teaching, leading a study, or thinking a passage through. Verse text is captured at the moment a verse is added (by hand or via import), so it won't shift under you later if you switch translations. Tap any block to edit it in place, reorder with the ↑↓ arrows, and copy the whole thing as **text** or as **JSON** when you're ready to use it elsewhere.
+
+**⚡ Import from AI**, on the outline list, builds a prompt from a topic ("Emmanuel: God With Us") or from an outline you already have — paste one in from ChatGPT, Claude, notes, wherever. Copy the prompt into any AI, paste its JSON reply back, and it becomes a real, editable outline. The AI supplies structure and its own wording; verse text always comes from the app's own Bible data, never from the AI — so nothing scriptural gets hallucinated or misquoted, and copyrighted translation text never has a way to leak in through an AI's reply.
+
+> AI-generated JSON reliably breaks in a few specific, well-known ways — curly "smart" quotation marks where a straight one was needed, a trailing comma before a closing bracket, an object key left unquoted — all signs of a model drifting toward "JavaScript-ish" instead of strict JSON. Both prompts (this one and the cross-reference one) now explicitly require ASCII-only output with quotes properly escaped, and the paste-back import repairs all three problems automatically — alone or in combination — if they happen anyway. If an import still fails, the error message says so directly rather than showing a bare parse error.
 
 All of Journal stays on your device and is included in your backup file.
 
@@ -162,7 +168,7 @@ Lookups run offline once the dictionaries are downloaded, and fall back to an on
 
 **Treasury of Scripture Knowledge** — several hundred thousand verse-to-verse links compiled over more than a century, ranked by how many editors flagged each one. Download it, then reach it from any verse's menu. Large download; do it on Wi-Fi.
 
-**AI-assisted** — Berea writes the prompt; you paste it into whatever AI you already use and paste the reply back to import. No account or API key required. The prompt asks for quotations, fulfilments, thematic parallels, and *undesigned coincidences*, and returns structured JSON that the app parses into selectable suggestions. You choose which become a tab.
+**AI-assisted** — Berea writes the prompt; you paste it into whatever AI you already use and paste the reply back to import. No account or API key required. The prompt asks for quotations, fulfilments, thematic parallels, and *undesigned coincidences*, and returns structured JSON that the app parses into selectable suggestions. You choose which become a tab. (Same quote-repair as outline import, below, covers this too — malformed AI JSON is a shared problem with a shared fix.)
 
 Optionally you can connect an API key (Claude, OpenAI, or any OpenAI-compatible endpoint) for one-tap lookups instead of copy/paste. The key is stored only in your browser and sent only to that provider.
 
@@ -226,6 +232,8 @@ Some notes for anyone modifying it:
 - Verse keys are `Book|Chapter|Verse` throughout — highlights, notes, cross-references, tagged text, and memory verses all share that format.
 - Data-source parsers are deliberately defensive. The Strong's tag parser auto-detects between markup conventions; the Nave's CSV loader detects column names and fails with a readable error naming the actual headers rather than importing nothing silently.
 - Bulk-import code is batched into chunked IndexedDB transactions to avoid blocking on large datasets. When a write transaction needs a read first (as the reading-plan merge does), the read happens in its own transaction *before* the write loop starts — interleaving an awaited read inside an open write transaction risks the transaction auto-committing early in some browsers, Safari especially.
+- Anything that calls `speechSynthesis.speak()` has to do so synchronously within the click handler that triggered it, or Safari/iOS silently drops the request with no error. Read-aloud keeps a small cache of the currently-displayed chapter for exactly this reason, rather than fetching fresh on tap.
+- AI JSON parsing (outline import, cross-reference import) shares one repair pipeline, `parseAiJsonLoose`, rather than each duplicating the same fixes. It handles curly quotes, trailing commas, and unquoted keys — stacked progressively, so a reply with more than one problem still repairs in a single pass — but only ever as a fallback after a first parse attempt on the untouched text fails. Never up front: every one of those patterns can also appear as legitimate *content* inside JSON that was never broken (a quoted phrase in a sentence, a list ending "a, b, c" right before an unrelated closing brace), so repairing pre-emptively would occasionally turn valid JSON into broken JSON instead of the other way round.
 - The concordance is a proper inverted index (Strong's number → every verse using it), built once with a database cursor rather than loading all tagged text into memory, and searched instantly afterward rather than rescanned per query.
 - Memorization uses a simplified SM-2 spaced-repetition schedule with an ease-factor floor, so repeated misses can't spiral a card into an unrecoverable state.
 - Reading-plan streaks compare **local calendar days**, not raw elapsed hours — a streak survives until a full day is missed, so it doesn't read as broken every morning before you've had a chance to read.
@@ -250,7 +258,9 @@ Some notes for anyone modifying it:
 
 **Search returns nothing.** Search only covers text stored on your device. Download a translation under ☰ Berea, or read a few chapters first.
 
-**🔊 read-aloud does nothing, or the toast says it's unsupported.** Depends entirely on the browser's SpeechSynthesis support — nearly universal on iOS/Android/desktop Safari, Chrome, and Edge, but can be missing in embedded webviews (an in-app browser inside another app, for instance). Try opening the page in the regular browser app.
+**🔊 read-aloud does nothing, or the toast says it's unsupported.** Depends entirely on the browser's SpeechSynthesis support — nearly universal on iOS/Android/desktop Safari, Chrome, and Edge, but can be missing in embedded webviews (an in-app browser inside another app, for instance). Try opening the page in the regular browser app. If it stayed silent with no error at all on an otherwise-supported browser, that was a real bug in an earlier version — `toggleReadAloud` awaited a database read before calling `speak()`, and Safari silently drops speech requests that aren't triggered synchronously by the tap that started them. Fixed by reading from the chapter already on screen instead.
+
+**Pasting an AI's outline or cross-reference JSON fails to import.** Almost always one of three things: curly "smart" quotation marks, a trailing comma before a closing bracket, or an unquoted object key — all common ways a model drifts toward JavaScript-ish output instead of strict JSON. The import repairs all three automatically, even in combination, after a first attempt fails; if it still won't import, the error message explains why. Worth knowing the repair is deliberately *not* applied up front — these patterns are also legitimate as ordinary content inside already-valid JSON (a quoted phrase in a discussion question, a list ending in a comma, say), so rewriting them pre-emptively would occasionally break JSON that was already fine.
 
 **A reading-plan streak looks wrong.** It's calculated from local calendar days, not a rolling 24-hour count, and today doesn't have to be done yet for the streak to still be "alive" — only a full missed day breaks it. If the streak seems off by exactly one, check the device's clock and timezone setting.
 

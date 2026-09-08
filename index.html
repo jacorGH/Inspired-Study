@@ -3038,34 +3038,67 @@
   }
 
   // Shared repair core for anything pasted back from an AI chat. AI-
-  // generated "JSON" reliably has one specific problem: curly/smart double
-  // quotes (\u201c \u201d) where the AI meant straight ones -- as the actual
-  // JSON delimiters, or as an unescaped quote inside a text field that
-  // prematurely closes the string. Plain JSON.parse rejects both outright
-  // with an unhelpful "Unexpected token" error.
+  // generated "JSON" reliably breaks in a handful of specific, well-known
+  // ways -- none of them content problems, all of them the model drifting
+  // toward "JavaScript-ish" instead of strict JSON:
+  //   - curly/smart quotes (\u201c \u201d) where a straight one was needed,
+  //     as the actual JSON delimiters or as an unescaped quote inside text
+  //   - a trailing comma before a closing } or ]
+  //   - object keys left unquoted, JS-object-literal style ({title: "x"})
+  // Plain JSON.parse rejects all of these outright with an unhelpful
+  // "Unexpected token" error that doesn't say which of the three it was.
   //
-  // Normalizing curly-to-straight quotes only happens AFTER a first parse
-  // attempt fails, never before: curly quotes are also completely
-  // legitimate as ordinary content inside an already-valid JSON string (a
-  // quoted phrase within a note or a discussion question, say), and
-  // rewriting those pre-emptively would turn valid JSON into broken JSON
-  // instead of the other way round. Returns null rather than throwing, so
-  // each caller can raise its own, more specific error message.
+  // Repairs only ever run AFTER a first parse attempt on the untouched text
+  // fails, never before: every one of these patterns can also appear as
+  // legitimate CONTENT inside JSON that was never broken (a quoted phrase
+  // in a sentence, a list ending "a, b, c" before an unrelated closing
+  // brace), so applying them pre-emptively would occasionally turn valid
+  // JSON into broken JSON instead of the other way round. Once something
+  // has already failed to parse, that risk is moot -- there's nothing
+  // valid left to protect.
+  //
+  // Repairs are applied progressively (each stacked on top of the last)
+  // rather than tried in isolation, since real AI output often has more
+  // than one of these problems in the same reply.
+  const JSON_REPAIRS = [
+    (s) => s.replace(/[\u201C\u201D]/g, '"'),                            // curly double quotes -> straight
+    (s) => s.replace(/,(\s*[}\]])/g, "$1"),                              // trailing comma before } or ]
+    (s) => s.replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g, '$1"$2"$3'),  // unquoted keys -> quoted
+  ];
+
   function parseAiJsonLoose(raw) {
     const stripped = String(raw || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
-    const normalizeQuotes = (s) => s.replace(/[\u201C\u201D]/g, '"');
     const tryParse = (s) => { try { return JSON.parse(s); } catch (e) { return null; } };
-    let data = tryParse(stripped) || tryParse(normalizeQuotes(stripped));
-    if (!data) {
-      const m = stripped.match(/\{[\s\S]*\}/);
-      if (m) data = tryParse(m[0]) || tryParse(normalizeQuotes(m[0]));
+
+    // Ladder of attempts against one candidate string: raw, then each
+    // repair stacked on top of the previous, so combinations of problems
+    // (e.g. curly quotes AND a trailing comma in the same reply) get fixed
+    // together rather than each repair only being tried alone.
+    function ladder(candidate) {
+      let working = candidate;
+      let data = tryParse(working);
+      if (data) return data;
+      for (const repair of JSON_REPAIRS) {
+        working = repair(working);
+        data = tryParse(working);
+        if (data) return data;
+      }
+      return null;
     }
+
+    let data = ladder(stripped);
+    if (data) return data;
+    // Same ladder again, restricted to the largest {...} span -- handles
+    // an AI that added commentary before or after the JSON despite being
+    // asked not to.
+    const m = stripped.match(/\{[\s\S]*\}/);
+    if (m) data = ladder(m[0]);
     return data;
   }
 
   function parseAiSuggestions(raw) {
     const data = parseAiJsonLoose(raw);
-    if (!data) throw new Error("Couldn't understand the AI's response \u2014 the most common cause is a curly quotation mark where a straight one was needed. Try asking the AI to resend it with plain ASCII quotes.");
+    if (!data) throw new Error("Couldn't understand the AI's response \u2014 usually a curly quotation mark, a trailing comma, or an unquoted key where plain JSON needed one. Try asking the AI to resend it as strict, ASCII-only JSON.");
     const list = (data && Array.isArray(data.suggestions)) ? data.suggestions : [];
     const out = [];
     for (const s of list) {
@@ -3082,7 +3115,7 @@
   }
 
   function buildCorrelationPrompt(refText, passageText) {
-    return "You are assisting with Bible study cross-referencing in an app called Berea. For this passage \u2014 " + refText + ': "' + passageText + '" \u2014 suggest up to 6 genuinely illuminating cross-references: verses that quote it, are quoted by it, fulfill it, parallel it thematically, or form an \u201cundesigned coincidence\u201d (an incidental detail in another passage that interlocks with this one in a way that looks unplanned, sometimes used as evidence of authenticity). For each, give one short sentence on why it connects. Respond with ONLY valid JSON, no markdown fences, no commentary before or after, in exactly this shape: {"suggestions":[{"reference":"Book Chapter:Verse","note":"...","type":"cross-reference"}]}. Use "type" values only from: cross-reference, thematic, undesigned-coincidence. Use plain straight ASCII double quotes only for JSON syntax \u2014 if a note needs to show a quoted phrase, use curly quotes (\u201clike this\u201d) instead of straight ones so it can\u2019t be confused with the JSON delimiters.';
+    return "You are assisting with Bible study cross-referencing in an app called Berea. For this passage \u2014 " + refText + ': "' + passageText + '" \u2014 suggest up to 6 genuinely illuminating cross-references: verses that quote it, are quoted by it, fulfill it, parallel it thematically, or form an \u201cundesigned coincidence\u201d (an incidental detail in another passage that interlocks with this one in a way that looks unplanned, sometimes used as evidence of authenticity). For each, give one short sentence on why it connects. Respond with ONLY valid JSON, no markdown fences, no commentary before or after, in exactly this shape: {"suggestions":[{"reference":"Book Chapter:Verse","note":"...","type":"cross-reference"}]}. Use "type" values only from: cross-reference, thematic, undesigned-coincidence. Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, no em-dashes or other typographic substitutions. Use a straight double quote (") for every JSON delimiter, and if a note needs to show a quoted phrase, escape it as \\" rather than switching characters.';
   }
 
   async function queryAiForCorrelations(refText, passageText) {
@@ -3712,7 +3745,7 @@ Produce a thorough, well-organized study outline as ONLY valid JSON, no markdown
 ]}
 Use "type" values only from: heading, text, point, question, verse. For "verse" blocks give ONLY the reference in the "reference" field \u2014 do not include the verse's wording, since the app looks up the actual text itself from its own Bible data. If converting an existing outline, preserve its structure and content rather than summarizing it. If building one from a topic, include several sections, each with teaching points, at least one verse, and a couple of discussion questions.
 
-Use plain straight ASCII double quotes (") only for JSON syntax \u2014 never curly/smart quotes (\u201c \u201d) for that. If any text field itself needs to show a quoted phrase, use curly quotes for it (like \u201cthis\u201d) rather than straight ones, so it can never be confused with the JSON delimiters around it.`;
+Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, no em-dashes or other typographic substitutions. Use a straight double quote (") for every JSON delimiter, and if a text field needs to show a quoted phrase, escape it as \\" rather than switching characters.`;
   }
 
   // Parses the AI's reply and validates the outline-specific shape;
@@ -3721,7 +3754,7 @@ Use plain straight ASCII double quotes (") only for JSON syntax \u2014 never cur
   function parseOutlineJson(raw) {
     const data = parseAiJsonLoose(raw);
     if (!data) {
-      throw new Error("That JSON didn't parse \u2014 the most common cause is a curly/smart quotation mark where the AI needed a plain one, often inside a quoted phrase in one of the text fields. Try asking the AI to resend it using only straight ASCII quotes, or fix the specific line the AI's reply points to.");
+      throw new Error("That JSON didn't parse \u2014 usually a curly quotation mark, a trailing comma, or an unquoted key where plain JSON needed one. Try asking the AI to resend it as strict, ASCII-only JSON, or fix the specific line the AI's reply points to.");
     }
     if (typeof data.title !== "string" || !data.title.trim()) throw new Error("Missing a \u201ctitle\u201d field.");
     if (!Array.isArray(data.blocks)) throw new Error("Missing a \u201cblocks\u201d array.");
