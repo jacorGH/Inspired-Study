@@ -672,6 +672,22 @@
     font-family: var(--font-ui); font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px; color: var(--gilt);
   }
   #myRosterRow:active { background: var(--gilt-soft); }
+  .outline-present-bar {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    padding: 8px 10px; background: var(--page-dim); border: 1px solid var(--gilt-soft); border-radius: 9px;
+  }
+  .outline-present-bar span {
+    flex: 1; text-align: center; font-family: var(--font-ui); font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+  }
+  .outline-present-bar button {
+    font-family: var(--font-ui); font-size: 13px; font-weight: 600; padding: 7px 12px;
+    border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--cover);
+  }
+  .outline-present-bar button:disabled { opacity: 0.35; }
+  .outline-current {
+    border-color: var(--cover) !important; box-shadow: 0 0 0 2px var(--cover);
+    background: var(--hl-yellow) !important;
+  }
   .code-input {
     flex: 1; font-family: var(--font-ui); font-size: 15px; padding: 10px 12px;
     border: 1px solid var(--line); border-radius: 9px; text-transform: uppercase;
@@ -3966,6 +3982,35 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     if (state.outlineEditingId === outline.id) renderOutlineEditor();
   }
 
+  // Ephemeral, not persisted with the outline: which block is currently
+  // "on screen" for a live-led session. Tracked by block id rather than
+  // index, since editing (insert/delete/reorder) can happen during a
+  // session and an index would silently point at the wrong block once the
+  // list shifts under it -- an id survives that.
+  let outlinePresentBlockId = null;
+
+  function broadcastOutlineFocus(outlineId, blockId) {
+    if (mesh.active) meshBroadcast({ t: "outline-focus", outlineId, blockId });
+  }
+
+  // Moves the presentation cursor to `blockId` (or null to clear it),
+  // re-renders to show the highlight, scrolls it into view, and -- only
+  // when this device is actually leading -- tells the group to follow.
+  // Followers call this too (from the outline-focus receive handler) with
+  // broadcast suppressed, since re-broadcasting what you just received
+  // would loop it back around the group.
+  function setOutlinePresent(outlineId, blockId, shouldBroadcast) {
+    outlinePresentBlockId = blockId;
+    if (shouldBroadcast && mesh.isLeader) broadcastOutlineFocus(outlineId, blockId);
+    if (state.outlineEditingId === outlineId) {
+      renderOutlineEditor().then(() => {
+        if (!blockId) return;
+        const el = document.querySelector(`[data-block-id="${CSS.escape(blockId)}"]`);
+        if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
+  }
+
   async function renderOutlineEditor() {
     const wrap = $("#journalBody");
     if (!wrap) return;
@@ -3980,21 +4025,35 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
           <button data-insert-after="${i}" title="Insert a block after this one">+</button>
           <button data-del="${i}">\u00d7</button>
         </div>`;
-      if (b.type === "heading") return `<div class="outline-block outline-heading">${controls}<div class="testament-label" style="margin:0" data-edit="${i}">${escapeHtml(b.text)}</div></div>`;
-      if (b.type === "text") return `<div class="outline-block">${controls}<div style="font-size:14px;line-height:1.55" data-edit="${i}">${escapeHtml(b.text)}</div></div>`;
-      if (b.type === "point") return `<div class="outline-block outline-point">${controls}<div data-edit="${i}">\u2022 ${escapeHtml(b.text)}</div></div>`;
+      const current = b.id === outlinePresentBlockId ? " outline-current" : "";
+      if (b.type === "heading") return `<div class="outline-block outline-heading${current}" data-block-id="${escapeHtml(b.id)}">${controls}<div class="testament-label" style="margin:0" data-edit="${i}">${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "text") return `<div class="outline-block${current}" data-block-id="${escapeHtml(b.id)}">${controls}<div style="font-size:14px;line-height:1.55" data-edit="${i}">${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "point") return `<div class="outline-block outline-point${current}" data-block-id="${escapeHtml(b.id)}">${controls}<div data-edit="${i}">\u2022 ${escapeHtml(b.text)}</div></div>`;
       if (b.type === "question") {
         const answerHtml = b.answer
           ? `<div class="outline-answer" data-edit-answer="${i}">${escapeHtml(b.answer)}</div>`
           : `<button class="outline-add-answer" data-add-answer="${i}">+ Add answer / notes</button>`;
-        return `<div class="outline-block outline-question">${controls}<div style="font-style:italic;color:var(--ink-soft)" data-edit="${i}">? ${escapeHtml(b.text)}</div>${answerHtml}</div>`;
+        return `<div class="outline-block outline-question${current}" data-block-id="${escapeHtml(b.id)}">${controls}<div style="font-style:italic;color:var(--ink-soft)" data-edit="${i}">? ${escapeHtml(b.text)}</div>${answerHtml}</div>`;
       }
-      return `<div class="outline-block outline-verse">${controls}<div class="page-title" style="margin:0 0 4px">${escapeHtml(refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd))}</div><div style="font-size:14px;color:var(--ink-soft)">${escapeHtml(b.text)}</div></div>`;
+      return `<div class="outline-block outline-verse${current}" data-block-id="${escapeHtml(b.id)}">${controls}<div class="page-title" style="margin:0 0 4px">${escapeHtml(refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd))}</div><div style="font-size:14px;color:var(--ink-soft)">${escapeHtml(b.text)}</div></div>`;
     };
+
+    const leading = mesh.active && mesh.isLeader;
+    const presentIdx = outlinePresentBlockId ? outline.blocks.findIndex((b) => b.id === outlinePresentBlockId) : -1;
+    const presentBar = leading && outline.blocks.length ? `
+      <div class="outline-present-bar">
+        ${presentIdx === -1
+          ? `<button class="dl" id="outlinePresentStart" style="flex:1">\u25b6 Start presenting to the group</button>`
+          : `<button id="outlinePrevBtn" ${presentIdx <= 0 ? "disabled" : ""}>\u2039 Prev</button>
+             <span>${presentIdx + 1} of ${outline.blocks.length}</span>
+             <button id="outlineNextBtn" ${presentIdx >= outline.blocks.length - 1 ? "disabled" : ""}>Next \u203a</button>
+             <button id="outlinePresentStop" title="Stop presenting">\u25a0</button>`}
+      </div>` : "";
 
     wrap.innerHTML = `
       <button id="outlineBackBtn" style="background:none;border:none;color:var(--cover);font-family:var(--font-ui);font-size:13px;font-weight:600;padding:0 0 12px">\u2039 All outlines</button>
       <div class="trcard-name" style="font-size:19px;margin-bottom:14px" id="outlineTitleDisplay">${escapeHtml(outline.title)}</div>
+      ${presentBar}
       ${outline.blocks.length ? outline.blocks.map(blockHtml).join("") : `<div class="hint">Empty so far. Add a block below, or import one from an AI.</div>`}
       <button class="dl" id="outlineAddEndBtn" style="width:100%;margin:6px 0 14px">+ Add a block</button>
       ${mesh.active ? `<button class="dl" id="outlineShareBtn" style="width:100%;margin-bottom:8px">\u{1F465} Share with study group</button>` : ""}
@@ -4026,6 +4085,18 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       broadcastOutlineShare(outline);
       toast("Shared with the study group");
     });
+    $("#outlinePresentStart")?.addEventListener("click", () => {
+      if (outline.blocks.length) setOutlinePresent(outline.id, outline.blocks[0].id, true);
+    });
+    $("#outlinePrevBtn")?.addEventListener("click", () => {
+      const idx = outline.blocks.findIndex((b) => b.id === outlinePresentBlockId);
+      if (idx > 0) setOutlinePresent(outline.id, outline.blocks[idx - 1].id, true);
+    });
+    $("#outlineNextBtn")?.addEventListener("click", () => {
+      const idx = outline.blocks.findIndex((b) => b.id === outlinePresentBlockId);
+      if (idx < outline.blocks.length - 1) setOutlinePresent(outline.id, outline.blocks[idx + 1].id, true);
+    });
+    $("#outlinePresentStop")?.addEventListener("click", () => setOutlinePresent(outline.id, null, true));
 
     wrap.querySelectorAll("[data-move]").forEach((btn) => {
       btn.addEventListener("click", async (ev) => {
@@ -4688,6 +4759,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       <p><strong>Leading:</strong> whoever leads moves the group through the passage. Anyone can tap <em>Take the lead</em>, and anyone can switch off <em>Follow along</em> to wander on their own.</p>
       <p><strong>Sharing marks</strong> is off by default. Switch it on and your highlights and notes go to everyone else who also has it on, and theirs come to you. Leave it off to mark up privately. If you turn it on mid-study, <em>Send my existing marks</em> catches the group up on the current chapter.</p>
       <p><strong>Sharing an outline</strong> — open it under Journal › Outlines while in a session and tap <em>Share with study group</em>; it appears in everyone's own Outlines list. Sharing again after further edits updates their copy.</p>
+      <p>Once it's shared, the <strong>leader</strong> gets a presenting bar (▶ Start presenting, then ‹ Prev / Next ›) at the top of that outline. Stepping through it highlights the current block and moves everyone whose <em>Follow along</em> is switched on straight to it — the same toggle that follows Bible chapters already uses, so one switch covers both.</p>
       <p>Everyone connects directly to everyone else, so the session keeps going even if the person who started it closes their tab. Reopening the same link rejoins.</p>
       <p>When you leave, if the group covered any ground, you'll get a <strong>recap</strong> \u2014 passages visited and tabs pinned during the session, ready to copy and share. It's yours alone; each person's recap reflects what they had open, and it's never sent to anyone automatically.</p>` },
 
@@ -5055,6 +5127,28 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         });
         break;
       }
+      case "outline-focus": {
+        // Reuses the same "following" toggle chapter navigation already
+        // respects -- one switch governs whether the leader moves you
+        // through scripture AND through an outline. The leader's own
+        // stepping doesn't re-apply this to themselves (isLeader peers
+        // never receive their own broadcasts anyway).
+        if (!mesh.following || !msg.outlineId) break;
+        getOutline(msg.outlineId).then((outline) => {
+          if (!outline) return; // never received via "Share with study group"; nothing to jump to
+          const alreadyThere = state.journalMode === "outline" && state.outlineEditingId === msg.outlineId;
+          if (!alreadyThere) {
+            state.journalMode = "outline";
+            state.outlineEditingId = msg.outlineId;
+          }
+          setOutlinePresent(msg.outlineId, msg.blockId || null, false);
+          if (!alreadyThere) {
+            setView("journal");
+            $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "journal"));
+          }
+        });
+        break;
+      }
       // Shared markup: only applied when this peer has sharing switched on,
       // so someone reading along privately never has their own highlights
       // or notes overwritten by the group.
@@ -5204,6 +5298,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     mesh.leaderId = null; mesh.isLeader = false; mesh.isHost = false;
     mesh.shareMarkup = false; // never carries over into the next session
     mesh.pendingAutoJoinCode = null; mesh.joinStatus = null;
+    outlinePresentBlockId = null; // presentation only makes sense mid-session
     sessionLog.startedAt = null;
     history.replaceState(null, "", location.pathname + location.search);
     renderStudyView();
