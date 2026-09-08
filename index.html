@@ -223,6 +223,35 @@
     vertical-align: super;
     margin-right: 2px;
   }
+  .outline-block {
+    position: relative; border: 1px solid var(--line); border-radius: 9px;
+    padding: 10px 62px 10px 12px; margin-bottom: 8px; background: var(--panel);
+  }
+  .outline-heading { background: var(--page-dim); border-color: var(--gilt-soft); }
+  .outline-verse { border-left: 3px solid var(--gilt); }
+  .outline-controls {
+    position: absolute; right: 6px; top: 6px; display: flex; gap: 2px;
+  }
+  .outline-controls button {
+    width: 24px; height: 24px; font-size: 12px; line-height: 1;
+    border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink-soft);
+  }
+  .outline-controls button:disabled { opacity: 0.3; }
+  .timer-face {
+    font-family: var(--font-display); font-size: 40px; font-weight: 600;
+    color: var(--cover); letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .prayer-row { cursor: pointer; }
+  .prayer-row:active { background: var(--page-dim); }
+  .answered-row { border-color: var(--gilt-soft); background: #FFFDF6; }
+  .back-chip {
+    display: block; width: 100%; text-align: left;
+    font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+    color: var(--cover); background: var(--page-dim);
+    border: 1px solid var(--gilt-soft); border-radius: 9px;
+    padding: 9px 12px; margin-bottom: 12px;
+  }
+  .back-chip:active { background: var(--gilt-soft); }
   .read-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px;
   }
@@ -233,6 +262,7 @@
     background: var(--panel); color: var(--ink-soft);
   }
   .strongs-toggle.on { background: var(--cover); color: var(--cover-text); border-color: var(--cover); }
+  .verse.reading-now { background: var(--hl-yellow); border-radius: 3px; }
   .sword {
     border-bottom: 1px dotted var(--gilt);
     cursor: pointer;
@@ -650,6 +680,7 @@
     <section id="view-read" class="view active">
       <div class="read-head">
         <h1 id="readChapterTitle"></h1>
+        <button id="listenBtn" type="button" class="strongs-toggle" title="Read this chapter aloud">🔊</button>
         <button id="strongsModeBtn" type="button" class="strongs-toggle">Strong's</button>
       </div>
       <div id="readBody" class="verseflow"></div>
@@ -733,6 +764,12 @@
     </section>
 
     <section id="view-journal" class="view">
+      <div class="seg-toggle" id="journalModeToggle">
+        <button data-jmode="prayer" class="active" type="button">Prayer</button>
+        <button data-jmode="plan" type="button">Plan</button>
+        <button data-jmode="memory" type="button">Memory</button>
+        <button data-jmode="outline" type="button">Outlines</button>
+      </div>
       <div id="journalBody"></div>
     </section>
 
@@ -838,6 +875,60 @@
     <div id="strongsEntryBody" style="font-size:14.5px;line-height:1.6;margin-bottom:14px"></div>
     <div class="sheet-actions">
       <button class="ghost" id="strongsEntryClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Study session recap -->
+<div id="recapBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref">Study recap</div>
+    <div class="sheet-text" id="recapStatus"></div>
+    <textarea id="recapText" class="ai-textarea" style="height:180px" readonly></textarea>
+    <div class="sheet-actions" style="margin-top:10px">
+      <button class="primary" id="recapCopyBtn">Copy recap</button>
+      <button class="ghost" id="recapCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Verse memorization practice -->
+<div id="memPracticeBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref" id="memPracticeRef"></div>
+    <div id="memPracticeText" style="min-height:90px"></div>
+    <button class="dl" id="memRevealBtn" style="width:100%;margin-top:10px">Show verse</button>
+    <div id="memRatingRow" style="display:none;margin-top:14px">
+      <div class="testament-label" style="margin-top:0">How did that go?</div>
+      <div style="display:flex;gap:6px">
+        <button class="dl mem-rate" data-rating="again" style="flex:1;background:var(--panel);color:var(--ink);border:1px solid var(--line)">Again</button>
+        <button class="dl mem-rate" data-rating="hard" style="flex:1;background:var(--panel);color:var(--ink);border:1px solid var(--line)">Hard</button>
+        <button class="dl mem-rate" data-rating="good" style="flex:1">Good</button>
+        <button class="dl mem-rate" data-rating="easy" style="flex:1">Easy</button>
+      </div>
+    </div>
+    <div class="sheet-actions" style="margin-top:14px">
+      <button class="ghost" id="memPracticeClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Prayer request detail -->
+<div id="prayerSheetBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref" id="prayerSheetTitle"></div>
+    <div class="sheet-text" id="prayerSheetMeta"></div>
+    <textarea id="prayerSheetDetail" class="ai-textarea" style="height:80px" placeholder="Any detail you want to remember…"></textarea>
+    <div id="prayerAnswerWrap" style="display:none;margin-top:12px">
+      <div class="testament-label" style="margin-top:0">How it was answered</div>
+      <textarea id="prayerSheetAnswer" class="ai-textarea" style="height:80px" placeholder="What happened?"></textarea>
+    </div>
+    <div class="sheet-actions" style="margin-top:14px">
+      <button class="primary" id="prayerMarkPrayed">Prayed for this today</button>
+      <button id="prayerMarkAnswered">Mark as answered ✨</button>
+      <select id="prayerCategorySel"></select>
+      <button id="prayerDeleteBtn">Delete request</button>
+      <button class="ghost" id="prayerSheetClose">Close</button>
     </div>
   </div>
 </div>
@@ -1063,7 +1154,7 @@
      IndexedDB layer
   ===================================================================== */
   const DB_NAME = "berea";
-  const DB_VERSION = 6;
+  const DB_VERSION = 8;
   let _dbPromise = null;
 
   function openDB() {
@@ -1096,6 +1187,20 @@
         if (!db.objectStoreNames.contains("topics")) {
           // Nave's Topical: one record per topic heading.
           db.createObjectStore("topics", { keyPath: "key" });
+        }
+        if (!db.objectStoreNames.contains("planProgress")) {
+          // One record per plan: which days are marked read, when.
+          db.createObjectStore("planProgress", { keyPath: "planId" });
+        }
+        if (!db.objectStoreNames.contains("memoryVerses")) {
+          db.createObjectStore("memoryVerses", { keyPath: "ref" });
+        }
+        if (!db.objectStoreNames.contains("outlines")) {
+          db.createObjectStore("outlines", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("prayers")) {
+          const pstore = db.createObjectStore("prayers", { keyPath: "id" });
+          pstore.createIndex("byStatus", "status", { unique: false });
         }
         if (!db.objectStoreNames.contains("concordance")) {
           // Inverted index: Strong's number -> every verse using that word.
@@ -1944,6 +2049,14 @@
     activeTabId: null,
     verseFocus: null,
     strongsMode: false,
+    searchMode: "verses",
+    searchQueries: { verses: "", tabs: "", topics: "", words: "" },
+    // Set when the reader was reached from a result list, so we can offer a
+    // way back to exactly that list rather than dumping the user at a reset
+    // search box.
+    returnCtx: null,
+    journalMode: "prayer",
+    outlineEditingId: null,
   };
   let searchIndexCache = {};
 
@@ -2005,11 +2118,69 @@
   }
 
   /* ---- Read view ---- */
+  /* =====================================================================
+     Read-aloud
+     ---------------------------------------------------------------------
+     Browser SpeechSynthesis, one verse at a time rather than the whole
+     chapter as one utterance -- that's what makes it possible to highlight
+     the verse currently being read and to resume mid-chapter after a pause,
+     neither of which a single long utterance supports. State lives on
+     `reading` rather than inline in the click handler so navigating away
+     mid-read can stop it cleanly instead of leaving an orphaned utterance
+     talking over whatever's on screen next.
+  ===================================================================== */
+  const reading = { active: false, paused: false, verses: [], idx: 0 };
+
+  function speechSupported() {
+    return typeof window !== "undefined" && "speechSynthesis" in window;
+  }
+
+  function stopReading() {
+    reading.active = false;
+    reading.paused = false;
+    reading.verses = [];
+    if (speechSupported()) window.speechSynthesis.cancel();
+    $$(".verse.reading-now").forEach((el) => el.classList.remove("reading-now"));
+    $("#listenBtn")?.classList.remove("on");
+  }
+
+  function speakCurrentVerse() {
+    if (!reading.active || reading.idx >= reading.verses.length) { stopReading(); return; }
+    const v = reading.verses[reading.idx];
+    $$(".verse.reading-now").forEach((el) => el.classList.remove("reading-now"));
+    const el = document.querySelector(`.verse[data-book="${CSS.escape(v.book)}"][data-chapter="${v.chapter}"][data-verse="${v.verse}"]`);
+    if (el) { el.classList.add("reading-now"); el.scrollIntoView({ block: "center", behavior: "smooth" }); }
+    const utter = new SpeechSynthesisUtterance(`${v.verse}. ${v.text}`);
+    utter.rate = 0.95;
+    utter.onend = () => {
+      if (!reading.active || reading.paused) return;
+      reading.idx++;
+      speakCurrentVerse();
+    };
+    utter.onerror = () => stopReading();
+    window.speechSynthesis.speak(utter);
+  }
+
+  async function toggleReadAloud() {
+    if (!speechSupported()) { toast("This browser can't read text aloud."); return; }
+    if (reading.active) { stopReading(); return; }
+    const rows = await getChapterVerses(state.readTr, state.book, state.chapter);
+    if (!rows.length) { toast("Nothing loaded to read yet."); return; }
+    reading.active = true;
+    reading.paused = false;
+    reading.verses = rows;
+    reading.idx = 0;
+    $("#listenBtn").classList.add("on");
+    speakCurrentVerse();
+  }
+
   async function renderRead() {
+    stopReading();
     $("#refBtn").textContent = `${state.book.name} ${state.chapter}`;
     $("#trBadge").value = state.readTr;
     $("#readChapterTitle").textContent = `${state.book.name} ${state.chapter}`;
     $("#readBody").innerHTML = `<div class="page-loading">Loading…</div>`;
+    renderBackToResults();
     try {
       const [rows, hl, notes] = await Promise.all([
         getChapterVerses(state.readTr, state.book, state.chapter),
@@ -2181,7 +2352,7 @@
     const sel = $("#searchTr");
     sel.innerHTML = TR_ORDER.map((t) => `<option value="${t}">${t}</option>`).join("");
     sel.value = state.readTr;
-    setSearchMode("verses");
+    setSearchMode(state.searchMode || "verses");
   }
 
   async function buildSearchIndex(trId) {
@@ -2226,6 +2397,7 @@
         const r = matches[parseInt(el.dataset.i, 10)];
         state.book = bookByName(r.book); state.chapter = r.chapter; state.verseFocus = r.verse;
         state.readTr = trId;
+        setReturnContext({ mode: "verses", label: "search results", sheet: null });
         setView("read");
       });
     });
@@ -2245,16 +2417,73 @@
     });
   }
 
-  function setSearchMode(mode) {
+  const SEARCH_INPUTS = { verses: "#searchInput", tabs: "#tabSearchInput",
+    topics: "#topicSearchInput", words: "#wordSearchInput" };
+
+  function setSearchMode(mode, opts) {
+    const o = opts || {};
+    state.searchMode = mode;
     $$("#searchModeToggle button").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
     $("#searchForm").style.display = mode === "verses" ? "flex" : "none";
     $("#tabSearchForm").style.display = mode === "tabs" ? "flex" : "none";
     $("#topicSearchForm").style.display = mode === "topics" ? "flex" : "none";
     $("#wordSearchForm").style.display = mode === "words" ? "flex" : "none";
-    $("#searchResults").innerHTML = "";
+    // Put the last query for this mode back in its box so switching modes
+    // (or coming back from a verse) doesn't wipe what you typed.
+    const inputSel = SEARCH_INPUTS[mode];
+    if (inputSel && $(inputSel)) $(inputSel).value = state.searchQueries[mode] || "";
+    if (!o.keepResults) $("#searchResults").innerHTML = "";
     if (mode === "tabs") runTabSearch($("#tabSearchInput").value);
     if (mode === "topics") runTopicSearch($("#topicSearchInput").value);
     if (mode === "words") runWordSearch($("#wordSearchInput").value);
+    if (mode === "verses" && state.searchQueries.verses) {
+      runSearch($("#searchTr").value, state.searchQueries.verses);
+    }
+  }
+
+  // Remembers the list a verse was reached from, so the reader can offer a
+  // one-tap way back into it — including reopening the topic or word sheet
+  // at the same place rather than just the bare search box.
+  function setReturnContext(ctx) {
+    state.returnCtx = ctx;
+  }
+
+  function clearReturnContext() {
+    if (!state.returnCtx) return;
+    state.returnCtx = null;
+    const chip = $("#backToResults");
+    if (chip) chip.remove();
+  }
+
+  function resumeReturnContext() {
+    const ctx = state.returnCtx;
+    if (!ctx) return;
+    if (ctx.sheet === "xref" && ctx.payload) {
+      // Cross-refs were opened from a verse, so stay in the reader.
+      openXrefSheet(ctx.payload.book, ctx.payload.chapter, ctx.payload.verse);
+      return;
+    }
+    setView("search");
+    $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "search"));
+    setSearchMode(ctx.mode);
+    // Reopen the exact list that was being browsed, when there was one.
+    if (ctx.sheet === "topic" && ctx.payload) openTopicSheet(ctx.payload);
+    else if (ctx.sheet === "word" && ctx.payload) openConcordanceSheet(ctx.payload);
+  }
+
+  function renderBackToResults() {
+    const existing = $("#backToResults");
+    if (existing) existing.remove();
+    const ctx = state.returnCtx;
+    if (!ctx || state.view !== "read") return;
+    const chip = document.createElement("button");
+    chip.id = "backToResults";
+    chip.type = "button";
+    chip.className = "back-chip";
+    chip.innerHTML = `\u2039 Back to ${escapeHtml(ctx.label)}`;
+    chip.addEventListener("click", resumeReturnContext);
+    const body = $("#readBody");
+    body.parentNode.insertBefore(chip, body);
   }
 
   let lastTopicResults = [];
@@ -2365,6 +2594,8 @@
         if (!book) return;
         state.book = book; state.chapter = r.chapter; state.verseFocus = r.verse;
         $("#wordSheetBackdrop").classList.remove("show");
+        setReturnContext({ mode: "words", sheet: "word", payload: currentConcordance,
+          label: (currentConcordance.lemma || currentConcordance.key) });
         setView("read");
       });
     });
@@ -2387,6 +2618,7 @@
         if (!book) return;
         state.book = book; state.chapter = r.chapter; state.verseFocus = r.verseStart;
         $("#topicSheetBackdrop").classList.remove("show");
+        setReturnContext({ mode: "topics", sheet: "topic", payload: topic, label: topic.topic });
         setView("read");
       });
     });
@@ -2497,6 +2729,7 @@
       btn.addEventListener("click", () => {
         state.book = book;
         state.chapter = parseInt(btn.dataset.ch, 10);
+        clearReturnContext();
         closePicker();
         setView(state.view === "compare" ? "compare" : "read");
         broadcastNavIfLeader();
@@ -2558,6 +2791,7 @@
     }
     actions += `<button id="vsAskAi">✦ Find cross-references (AI)</button>`;
     actions += `<button id="vsXref">\u{1F4DA} Traditional cross-references (TSK)</button>`;
+    actions += `<button id="vsMemorize">\u{1F9E0} Add to memory verses</button>`;
     actions += `<button id="vsCopy">Copy text</button><button id="vsClose">Close</button>`;
     $("#vsActions").innerHTML = actions;
 
@@ -2597,6 +2831,12 @@
     $("#vsXref").addEventListener("click", () => {
       closeVerseSheet();
       openXrefSheet(bookName, chapter, verse);
+    });
+    $("#vsMemorize").addEventListener("click", async () => {
+      const ref = `${bookName}|${chapter}|${verse}`;
+      await saveMemoryVerse(ref, text, state.readTr);
+      closeVerseSheet();
+      toast("Added to memory verses");
     });
     $("#vsClose").addEventListener("click", closeVerseSheet);
 
@@ -2863,11 +3103,697 @@
     });
   }
 
-  function renderJournalView() {
+  /* =====================================================================
+     Prayer journal
+     ---------------------------------------------------------------------
+     Deliberately NOT gamified. Reading plans get streaks because the goal
+     there is a daily habit; applying streaks to prayer would turn something
+     devotional into score-keeping, and a broken streak becomes guilt about
+     prayer. So this keeps a quiet record -- when you last prayed for
+     something, how long you've carried it -- and saves its warmth for the
+     moment a request is answered.
+
+     Prayer time is tracked as logged sessions (a simple timer), stored as
+     minutes so a total can be shown without implying a target.
+  ===================================================================== */
+  const PRAYER_CATEGORIES = ["Family", "Church", "Health", "Work", "World", "Thanks", "Other"];
+
+  async function allPrayers() {
+    const db = await openDB();
+    const tx = db.transaction("prayers", "readonly");
+    return await idbReq(tx.objectStore("prayers").getAll());
+  }
+  async function putPrayer(rec) {
+    const db = await openDB();
+    const tx = db.transaction("prayers", "readwrite");
+    tx.objectStore("prayers").put(rec);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function deletePrayer(id) {
+    const db = await openDB();
+    const tx = db.transaction("prayers", "readwrite");
+    tx.objectStore("prayers").delete(id);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+
+  function daysSince(ts) {
+    if (!ts) return null;
+    return Math.floor((Date.now() - ts) / 86400000);
+  }
+  function relativeDay(ts) {
+    const d = daysSince(ts);
+    if (d === null) return "";
+    if (d === 0) return "today";
+    if (d === 1) return "yesterday";
+    if (d < 30) return d + " days ago";
+    if (d < 365) return Math.floor(d / 30) + " month" + (Math.floor(d / 30) === 1 ? "" : "s") + " ago";
+    return Math.floor(d / 365) + " year" + (Math.floor(d / 365) === 1 ? "" : "s") + " ago";
+  }
+
+  function getPrayerMinutes() {
+    return parseInt(localStorage.getItem("berea.prayerMinutes") || "0", 10) || 0;
+  }
+  function addPrayerMinutes(mins) {
+    localStorage.setItem("berea.prayerMinutes", String(getPrayerMinutes() + mins));
+  }
+
+  /* ---- prayer timer ---- */
+  const prayerTimer = { startedAt: null, tickHandle: null };
+
+  function startPrayerTimer() {
+    prayerTimer.startedAt = Date.now();
+    prayerTimer.tickHandle = setInterval(updatePrayerTimerDisplay, 1000);
+    updatePrayerTimerDisplay();
+    renderPrayerJournal();
+  }
+  function stopPrayerTimer() {
+    if (!prayerTimer.startedAt) return;
+    const secs = Math.round((Date.now() - prayerTimer.startedAt) / 1000);
+    const mins = Math.max(1, Math.round(secs / 60));
+    clearInterval(prayerTimer.tickHandle);
+    prayerTimer.startedAt = null;
+    prayerTimer.tickHandle = null;
+    addPrayerMinutes(mins);
+    toast(`${mins} minute${mins === 1 ? "" : "s"} logged`);
+    renderPrayerJournal();
+  }
+  function updatePrayerTimerDisplay() {
+    const el = $("#prayerTimerDisplay");
+    if (!el || !prayerTimer.startedAt) return;
+    const secs = Math.floor((Date.now() - prayerTimer.startedAt) / 1000);
+    const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+    const ss = String(secs % 60).padStart(2, "0");
+    el.textContent = `${mm}:${ss}`;
+  }
+
+  /* ---- prayer detail sheet ---- */
+  let currentPrayer = null;
+
+  function openPrayerSheet(rec) {
+    currentPrayer = rec;
+    const answered = rec.status === "answered";
+    $("#prayerSheetTitle").textContent = rec.title;
+    $("#prayerSheetMeta").textContent =
+      `${rec.category || "Other"} \u00b7 added ${relativeDay(rec.createdAt)}` +
+      (answered ? ` \u00b7 answered ${relativeDay(rec.answeredAt)}`
+                : rec.lastPrayedAt ? ` \u00b7 last prayed ${relativeDay(rec.lastPrayedAt)}` : "");
+    $("#prayerSheetDetail").value = rec.detail || "";
+    $("#prayerSheetAnswer").value = rec.answerNote || "";
+    $("#prayerAnswerWrap").style.display = answered ? "block" : "none";
+    if ($("#prayerCategorySel")) $("#prayerCategorySel").value = rec.category || "Other";
+    $("#prayerMarkPrayed").style.display = answered ? "none" : "block";
+    $("#prayerMarkAnswered").textContent = answered ? "Move back to active" : "Mark as answered \u2728";
+    $("#prayerSheetBackdrop").classList.add("show");
+  }
+  function closePrayerSheet() {
+    if (currentPrayer) {
+      const detail = $("#prayerSheetDetail").value;
+      const answer = $("#prayerSheetAnswer").value;
+      if (detail !== (currentPrayer.detail || "") || answer !== (currentPrayer.answerNote || "")) {
+        currentPrayer.detail = detail;
+        currentPrayer.answerNote = answer;
+        putPrayer(currentPrayer).then(renderJournalView);
+      }
+    }
+    $("#prayerSheetBackdrop").classList.remove("show");
+  }
+
+  /* ---- journal view ---- */
+  /* =====================================================================
+     Reading plans
+     ---------------------------------------------------------------------
+     Streaks belong HERE and only here in the app -- a daily-habit goal is
+     exactly what a streak is for. (The prayer journal deliberately has none;
+     see the comment on that module for why.)
+
+     Plans are generated from BOOKS rather than hand-typed day lists, and
+     chapters are spread as evenly as the day count allows -- no day silently
+     gets 6 chapters because integer division dumped a remainder on it.
+  ===================================================================== */
+  function chapterList(bookNames) {
+    const out = [];
+    for (const name of bookNames) {
+      const b = bookByName(name);
+      if (!b) continue;
+      for (let c = 1; c <= b.chapters; c++) out.push({ book: b.name, chapter: c });
+    }
+    return out;
+  }
+  function distributeChapters(total, days) {
+    const base = Math.floor(total / days), extra = total % days;
+    const perDay = [];
+    for (let d = 0; d < days; d++) perDay.push(base + (d < extra ? 1 : 0));
+    return perDay;
+  }
+  function buildPlanDays(chapters, days) {
+    const perDay = distributeChapters(chapters.length, days);
+    const out = [];
+    let cursor = 0;
+    for (const n of perDay) { out.push(chapters.slice(cursor, cursor + n)); cursor += n; }
+    return out;
+  }
+  const OT_BOOKS = BOOKS.filter((b) => b.testament === "OT").map((b) => b.name);
+  const NT_BOOKS = BOOKS.filter((b) => b.testament === "NT").map((b) => b.name);
+  const ALL_BOOKS = BOOKS.map((b) => b.name);
+  const GOSPELS = ["Matthew", "Mark", "Luke", "John"];
+
+  const READING_PLANS = [
+    { id: "whole-365", name: "Whole Bible in a Year", days: 365, books: ALL_BOOKS },
+    { id: "nt-90", name: "New Testament in 90 Days", days: 90, books: NT_BOOKS },
+    { id: "gospels-30", name: "The Gospels in 30 Days", days: 30, books: GOSPELS },
+    { id: "psalms-31", name: "Psalms in a Month", days: 31, books: ["Psalms"] },
+    { id: "ot-180", name: "Old Testament in 180 Days", days: 180, books: OT_BOOKS },
+  ];
+  function getPlan(id) { return READING_PLANS.find((p) => p.id === id) || null; }
+  function planDays(plan) { return buildPlanDays(chapterList(plan.books), plan.days); }
+
+  async function getPlanProgress(planId) {
+    const db = await openDB();
+    const tx = db.transaction("planProgress", "readonly");
+    const rec = await idbReq(tx.objectStore("planProgress").get(planId));
+    return rec || { planId, startedAt: Date.now(), completions: {} }; // completions: { dayIndex: timestamp }
+  }
+  async function savePlanProgress(rec) {
+    const db = await openDB();
+    const tx = db.transaction("planProgress", "readwrite");
+    tx.objectStore("planProgress").put(rec);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function getAllPlanProgress() {
+    const db = await openDB();
+    const tx = db.transaction("planProgress", "readonly");
+    return await idbReq(tx.objectStore("planProgress").getAll());
+  }
+
+  function localDateKey(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  // A streak survives until a full day is missed -- today doesn't have to be
+  // done yet, so it doesn't read as "broken" every morning before you've had
+  // a chance to read.
+  function computeStreak(timestamps) {
+    if (!timestamps.length) return 0;
+    const days = new Set(timestamps.map(localDateKey));
+    let streak = 0;
+    const cursor = new Date();
+    if (!days.has(localDateKey(cursor.getTime()))) cursor.setDate(cursor.getDate() - 1);
+    while (days.has(localDateKey(cursor.getTime()))) { streak++; cursor.setDate(cursor.getDate() - 1); }
+    return streak;
+  }
+
+  function refLabelForChapters(chapters) {
+    if (!chapters.length) return "(rest day)";
+    const groups = [];
+    for (const c of chapters) {
+      const last = groups[groups.length - 1];
+      if (last && last.book === c.book && c.chapter === last.end + 1) last.end = c.chapter;
+      else groups.push({ book: c.book, start: c.chapter, end: c.chapter });
+    }
+    return groups.map((g) => g.start === g.end ? `${g.book} ${g.start}` : `${g.book} ${g.start}-${g.end}`).join(", ");
+  }
+
+  async function renderPlanView() {
     const wrap = $("#journalBody");
     if (!wrap) return;
+    const allProgress = await getAllPlanProgress();
+    const activeId = localStorage.getItem("berea.activePlan");
+    const active = activeId ? getPlan(activeId) : null;
+
+    if (!active) {
+      wrap.innerHTML = `
+        <div class="hint">Pick a plan to start tracking. Chapters are spread evenly across the days, and today's reading is always one tap away from here.</div>
+        ${READING_PLANS.map((p) => {
+          const prog = allProgress.find((x) => x.planId === p.id);
+          const done = prog ? Object.keys(prog.completions).length : 0;
+          return `<div class="trcard">
+            <div class="trcard-head">
+              <div>
+                <div class="trcard-name">${escapeHtml(p.name)}</div>
+                <div class="trcard-status">${p.days} days${done ? ` \u00b7 ${done} completed already` : ""}</div>
+              </div>
+              <button class="dl" data-startplan="${p.id}">${done ? "Resume" : "Start"}</button>
+            </div>
+          </div>`;
+        }).join("")}
+      `;
+      wrap.querySelectorAll("[data-startplan]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          localStorage.setItem("berea.activePlan", btn.dataset.startplan);
+          renderPlanView();
+        });
+      });
+      return;
+    }
+
+    const progress = await getPlanProgress(active.id);
+    const days = planDays(active);
+    const doneSet = new Set(Object.keys(progress.completions).map(Number));
+    const streak = computeStreak(Object.values(progress.completions));
+    // Today's assignment is the next undone day, not "day N by the
+    // calendar" -- so missing a few days doesn't strand you on a date-based
+    // slot that's already passed; you pick up exactly where you left off.
+    let todayIdx = days.findIndex((_, i) => !doneSet.has(i));
+    if (todayIdx === -1) todayIdx = days.length - 1;
+    const todayChapters = days[todayIdx];
+    const doneToday = doneSet.has(todayIdx);
+
     wrap.innerHTML = `
-      <div class="hint">This is where your own work will live — prayer requests and answered prayers, memory verses, reading-plan progress, and study outlines. Being built next; the concordance under <strong>Search › Words</strong> is ready now.</div>`;
+      <div class="trcard">
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">${escapeHtml(active.name)}</div>
+            <div class="trcard-status">${doneSet.size} of ${active.days} days \u00b7 ${streak ? `\u{1F525} ${streak}-day streak` : "no streak yet"}</div>
+          </div>
+          <button id="planSwitchBtn" style="font-family:var(--font-ui);font-size:12px;color:var(--ink-soft);background:none;border:none">Switch</button>
+        </div>
+        <div class="progress-track show" style="margin-top:10px"><div class="progress-fill" style="width:${Math.round((doneSet.size / active.days) * 100)}%"></div></div>
+      </div>
+      <div class="trcard" style="text-align:center">
+        <div class="testament-label" style="margin:0 0 6px">Day ${todayIdx + 1}</div>
+        <div class="trcard-name" style="font-size:19px;margin-bottom:12px">${escapeHtml(refLabelForChapters(todayChapters))}</div>
+        ${todayChapters.length ? `<button class="dl" id="planReadBtn" style="width:100%;margin-bottom:8px">Read today's passage</button>` : ""}
+        <button class="dl" id="planDoneBtn" style="width:100%" ${doneToday ? "disabled" : ""}>${doneToday ? "Done for today \u2713" : "Mark today as read"}</button>
+      </div>
+    `;
+    $("#planSwitchBtn").addEventListener("click", () => {
+      localStorage.removeItem("berea.activePlan");
+      renderPlanView();
+    });
+    $("#planReadBtn")?.addEventListener("click", () => {
+      const first = todayChapters[0];
+      const book = bookByName(first.book);
+      if (!book) return;
+      state.book = book; state.chapter = first.chapter;
+      setView("read");
+      $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "read"));
+    });
+    $("#planDoneBtn").addEventListener("click", async () => {
+      progress.completions[todayIdx] = Date.now();
+      await savePlanProgress(progress);
+      const newStreak = computeStreak(Object.values(progress.completions));
+      toast(newStreak > 1 ? `Day ${todayIdx + 1} done \u2014 \u{1F525} ${newStreak}-day streak` : "Marked as read");
+      renderPlanView();
+    });
+  }
+
+  /* =====================================================================
+     Verse memorization
+     ---------------------------------------------------------------------
+     Simplified SM-2 spaced repetition. Ease factor is floored at 1.3 so
+     repeated failures can't push a card into an unrecoverable death spiral,
+     and "Again" resets the interval without erasing review history, so a
+     verse that's been learned before and slips comes back faster than a
+     brand-new one would.
+
+     Practice hides a growing share of words as review count rises, rather
+     than a fixed difficulty -- the first review is closer to reading, later
+     ones closer to actual recall.
+  ===================================================================== */
+  const MIN_EASE = 1.3;
+
+  function scheduleNext(card, rating) {
+    let { interval, ease, reviewCount } = card;
+    reviewCount = (reviewCount || 0) + 1;
+    if (rating === "again") { interval = 1; ease = Math.max(MIN_EASE, ease - 0.2); }
+    else if (rating === "hard") { interval = Math.max(1, Math.round(interval * 1.2)); ease = Math.max(MIN_EASE, ease - 0.15); }
+    else if (rating === "good") { interval = reviewCount <= 1 ? 1 : Math.round(interval * ease); }
+    else if (rating === "easy") { interval = reviewCount <= 1 ? 3 : Math.round(interval * ease * 1.3); ease += 0.15; }
+    interval = Math.max(1, interval);
+    return { interval, ease, reviewCount, nextReview: Date.now() + interval * 86400000 };
+  }
+
+  async function saveMemoryVerse(ref, text, translationId) {
+    const db = await openDB();
+    const tx = db.transaction("memoryVerses", "readonly");
+    const existing = await idbReq(tx.objectStore("memoryVerses").get(ref));
+    if (existing) return; // already tracked; don't reset progress by re-adding
+    const rec = { ref, text, translationId, addedAt: Date.now(),
+      interval: 1, ease: 2.5, reviewCount: 0, nextReview: Date.now(), lastReviewed: null };
+    const wtx = db.transaction("memoryVerses", "readwrite");
+    wtx.objectStore("memoryVerses").put(rec);
+    await new Promise((res, rej) => { wtx.oncomplete = res; wtx.onerror = () => rej(wtx.error); });
+  }
+  async function getAllMemoryVerses() {
+    const db = await openDB();
+    return await idbReq(db.transaction("memoryVerses", "readonly").objectStore("memoryVerses").getAll());
+  }
+  async function saveMemCard(rec) {
+    const db = await openDB();
+    const tx = db.transaction("memoryVerses", "readwrite");
+    tx.objectStore("memoryVerses").put(rec);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function deleteMemCard(ref) {
+    const db = await openDB();
+    const tx = db.transaction("memoryVerses", "readwrite");
+    tx.objectStore("memoryVerses").delete(ref);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+
+  // Hides a growing share of words as reviewCount rises (0 -> ~15% -> up to
+  // ~65%), keeping short filler words visible longest since blanking "a" or
+  // "in" tests nothing.
+  function blankVerseText(text, reviewCount) {
+    const words = text.split(/(\s+)/); // keep whitespace tokens so spacing survives
+    const ratio = Math.min(0.65, (reviewCount || 0) * 0.12);
+    return words.map((w) => {
+      if (/^\s+$/.test(w) || w.length <= 2) return w;
+      if (Math.random() < ratio) return "_".repeat(Math.max(3, w.replace(/[^\w]/g, "").length));
+      return w;
+    }).join("");
+  }
+
+  let memoryQueue = [];
+  let memoryIdx = 0;
+
+  async function renderMemoryView() {
+    const wrap = $("#journalBody");
+    if (!wrap) return;
+    const all = await getAllMemoryVerses();
+    if (!all.length) {
+      wrap.innerHTML = `<div class="hint">No memory verses yet. Open any verse's menu while reading and tap <strong>Add to memory verses</strong> \u2014 they'll show up here for review.</div>`;
+      return;
+    }
+    const now = Date.now();
+    const due = all.filter((c) => !c.nextReview || c.nextReview <= now);
+    memoryQueue = due;
+    memoryIdx = 0;
+
+    wrap.innerHTML = `
+      <div class="trcard">
+        <div class="trcard-head">
+          <div>
+            <div class="trcard-name">Review</div>
+            <div class="trcard-status">${due.length ? `${due.length} due now` : "Nothing due \u2014 come back later"}</div>
+          </div>
+          ${due.length ? `<button class="dl" id="memStartBtn">Practice</button>` : ""}
+        </div>
+      </div>
+      <div class="testament-label" style="margin-top:18px">All memory verses (${all.length})</div>
+      ${all.sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0)).map((c) => `
+        <div class="trcard mem-row" data-ref="${escapeHtml(c.ref)}">
+          <div class="trcard-name" style="font-size:15px">${escapeHtml(c.ref.replace(/\|/g, " ").replace(/ (\d+) (\d+)$/, " $1:$2"))}</div>
+          <div class="trcard-status">${c.reviewCount ? `Reviewed ${c.reviewCount}\u00d7` : "New"}${
+            c.nextReview ? ` \u00b7 next ${c.nextReview <= now ? "due now" : new Date(c.nextReview).toLocaleDateString()}` : ""}</div>
+        </div>`).join("")}
+    `;
+    $("#memStartBtn")?.addEventListener("click", () => openMemoryPractice());
+    wrap.querySelectorAll(".mem-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const card = all.find((c) => c.ref === row.dataset.ref);
+        if (card) { memoryQueue = [card]; memoryIdx = 0; openMemoryPractice(); }
+      });
+    });
+  }
+
+  function openMemoryPractice() {
+    if (!memoryQueue.length) { $("#memPracticeBackdrop").classList.remove("show"); return; }
+    $("#memPracticeBackdrop").classList.add("show");
+    showMemoryCard();
+  }
+  function showMemoryCard() {
+    if (memoryIdx >= memoryQueue.length) {
+      $("#memPracticeRef").textContent = "All done";
+      $("#memPracticeText").innerHTML = `<div class="hint">Nice work \u2014 nothing else due right now.</div>`;
+      $("#memRevealBtn").style.display = "none";
+      $("#memRatingRow").style.display = "none";
+      return;
+    }
+    const card = memoryQueue[memoryIdx];
+    const parts = card.ref.split("|");
+    $("#memPracticeRef").textContent = `${parts[0]} ${parts[1]}:${parts[2]} \u00b7 ${memoryIdx + 1} of ${memoryQueue.length}`;
+    $("#memPracticeText").innerHTML = `<div class="hint" style="font-size:15px;line-height:1.7">Try to recall it, then tap to reveal.</div>`;
+    $("#memRevealBtn").style.display = "block";
+    $("#memRatingRow").style.display = "none";
+  }
+
+  /* =====================================================================
+     Study outline builder
+     ---------------------------------------------------------------------
+     The gap this fills: tabs are for COMPARING passages side by side;
+     nothing else in the app lets you build something you could actually
+     teach or hand out from -- your own points interleaved with verses in
+     an order you chose. An outline is a small ordered list of blocks
+     (heading / point / verse), reorderable with up/down controls rather
+     than drag-and-drop, which is far more reliable in plain JS on mobile.
+
+     Verse blocks snapshot the verse text at the moment they're added
+     (translation included) rather than re-fetching it live -- an outline
+     is closer to a document you're composing than a live view, so the
+     wording you picked shouldn't shift under you later if you switch
+     translations or the text updates.
+  ===================================================================== */
+  async function getAllOutlines() {
+    const db = await openDB();
+    return await idbReq(db.transaction("outlines", "readonly").objectStore("outlines").getAll());
+  }
+  async function getOutline(id) {
+    const db = await openDB();
+    return await idbReq(db.transaction("outlines", "readonly").objectStore("outlines").get(id));
+  }
+  async function saveOutline(rec) {
+    rec.updatedAt = Date.now();
+    const db = await openDB();
+    const tx = db.transaction("outlines", "readwrite");
+    tx.objectStore("outlines").put(rec);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function deleteOutline(id) {
+    const db = await openDB();
+    const tx = db.transaction("outlines", "readwrite");
+    tx.objectStore("outlines").delete(id);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+
+  function outlineToText(outline) {
+    const lines = [outline.title, "=".repeat(outline.title.length), ""];
+    for (const b of outline.blocks) {
+      if (b.type === "heading") lines.push("", b.text.toUpperCase(), "-".repeat(b.text.length));
+      else if (b.type === "point") lines.push("  \u2022 " + b.text);
+      else if (b.type === "verse") {
+        lines.push("", `  ${refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd)} (${b.translationId})`,
+          "  \u201c" + b.text + "\u201d");
+      }
+    }
+    return lines.join("\n");
+  }
+
+  async function renderOutlineListView() {
+    const wrap = $("#journalBody");
+    if (!wrap) return;
+    const outlines = (await getAllOutlines()).sort((a, b) => b.updatedAt - a.updatedAt);
+    wrap.innerHTML = `
+      <div class="hint">A study outline mixes your own points with the verses backing them, in the order you'll actually use them \u2014 teaching, leading a study, or just thinking a passage through.</div>
+      <button class="dl" id="outlineNewBtn" style="width:100%;margin-bottom:14px">+ New outline</button>
+      ${outlines.length ? outlines.map((o) => `
+        <div class="trcard outline-row" data-id="${escapeHtml(o.id)}">
+          <div class="trcard-name" style="font-size:16px">${escapeHtml(o.title)}</div>
+          <div class="trcard-status">${o.blocks.length} block${o.blocks.length === 1 ? "" : "s"} \u00b7 updated ${new Date(o.updatedAt).toLocaleDateString()}</div>
+        </div>`).join("") : `<div class="hint">No outlines yet.</div>`}
+    `;
+    $("#outlineNewBtn").addEventListener("click", async () => {
+      const title = prompt("Title for this outline?", "");
+      if (!title) return;
+      const rec = { id: "o_" + Date.now(), title, blocks: [], createdAt: Date.now(), updatedAt: Date.now() };
+      await saveOutline(rec);
+      state.outlineEditingId = rec.id;
+      renderOutlineEditor();
+    });
+    wrap.querySelectorAll(".outline-row").forEach((row) => {
+      row.addEventListener("click", () => { state.outlineEditingId = row.dataset.id; renderOutlineEditor(); });
+    });
+  }
+
+  function moveBlock(blocks, i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= blocks.length) return blocks;
+    const copy = blocks.slice();
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+    return copy;
+  }
+
+  async function renderOutlineEditor() {
+    const wrap = $("#journalBody");
+    if (!wrap) return;
+    const outline = await getOutline(state.outlineEditingId);
+    if (!outline) { state.outlineEditingId = null; renderOutlineListView(); return; }
+
+    const blockHtml = (b, i) => {
+      const controls = `
+        <div class="outline-controls">
+          <button data-move="up" data-i="${i}" ${i === 0 ? "disabled" : ""}>\u2191</button>
+          <button data-move="down" data-i="${i}" ${i === outline.blocks.length - 1 ? "disabled" : ""}>\u2193</button>
+          <button data-del="${i}">\u00d7</button>
+        </div>`;
+      if (b.type === "heading") return `<div class="outline-block outline-heading">${controls}<div class="testament-label" style="margin:0">${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "point") return `<div class="outline-block outline-point">${controls}<div>\u2022 ${escapeHtml(b.text)}</div></div>`;
+      return `<div class="outline-block outline-verse">${controls}<div class="page-title" style="margin:0 0 4px">${escapeHtml(refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd))}</div><div style="font-size:14px;color:var(--ink-soft)">${escapeHtml(b.text)}</div></div>`;
+    };
+
+    wrap.innerHTML = `
+      <button id="outlineBackBtn" style="background:none;border:none;color:var(--cover);font-family:var(--font-ui);font-size:13px;font-weight:600;padding:0 0 12px">\u2039 All outlines</button>
+      <div class="trcard-name" style="font-size:19px;margin-bottom:14px" id="outlineTitleDisplay">${escapeHtml(outline.title)}</div>
+      ${outline.blocks.length ? outline.blocks.map(blockHtml).join("") : `<div class="hint">Empty so far. Add a heading, a point, or a verse below.</div>`}
+      <div style="display:flex;gap:6px;margin:14px 0">
+        <button class="dl" id="outlineAddHeading" style="flex:1;font-size:12.5px">+ Heading</button>
+        <button class="dl" id="outlineAddPoint" style="flex:1;font-size:12.5px">+ Point</button>
+        <button class="dl" id="outlineAddVerse" style="flex:1;font-size:12.5px">+ Verse</button>
+      </div>
+      <button class="dl" id="outlineCopyBtn" style="width:100%;margin-bottom:8px">Copy as text</button>
+      <button id="outlineDeleteBtn" style="width:100%;font-family:var(--font-ui);font-weight:600;padding:11px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink-soft)">Delete outline</button>
+    `;
+    $("#outlineTitleDisplay").addEventListener("click", async () => {
+      const t = prompt("Rename this outline?", outline.title);
+      if (!t) return;
+      outline.title = t;
+      await saveOutline(outline);
+      renderOutlineEditor();
+    });
+    $("#outlineBackBtn").addEventListener("click", () => { state.outlineEditingId = null; renderOutlineListView(); });
+    $("#outlineAddHeading").addEventListener("click", async () => {
+      const t = prompt("Heading text?");
+      if (!t) return;
+      outline.blocks.push({ id: "b_" + Date.now(), type: "heading", text: t });
+      await saveOutline(outline); renderOutlineEditor();
+    });
+    $("#outlineAddPoint").addEventListener("click", async () => {
+      const t = prompt("Point text?");
+      if (!t) return;
+      outline.blocks.push({ id: "b_" + Date.now(), type: "point", text: t });
+      await saveOutline(outline); renderOutlineEditor();
+    });
+    $("#outlineAddVerse").addEventListener("click", async () => {
+      const raw = prompt('Reference? (e.g. "Romans 8:28")');
+      if (!raw) return;
+      const parsed = parseReference(raw);
+      if (!parsed) { toast("Couldn't understand that reference."); return; }
+      try {
+        const rows = await getChapterVerses(state.readTr, parsed.book, parsed.chapter);
+        const vs = parsed.verseStart
+          ? rows.filter((r) => r.verse >= parsed.verseStart && r.verse <= parsed.verseEnd)
+          : rows;
+        const text = vs.map((r) => r.text).join(" ") || "(text unavailable)";
+        outline.blocks.push({ id: "b_" + Date.now(), type: "verse", translationId: state.readTr,
+          ref: { book: parsed.book.name, chapter: parsed.chapter, verseStart: parsed.verseStart || 1, verseEnd: parsed.verseEnd || 1 },
+          text });
+      } catch (e) {
+        outline.blocks.push({ id: "b_" + Date.now(), type: "verse", translationId: state.readTr,
+          ref: { book: parsed.book.name, chapter: parsed.chapter, verseStart: parsed.verseStart || 1, verseEnd: parsed.verseEnd || 1 },
+          text: "(couldn't load text)" });
+      }
+      await saveOutline(outline); renderOutlineEditor();
+    });
+    wrap.querySelectorAll("[data-move]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        outline.blocks = moveBlock(outline.blocks, parseInt(btn.dataset.i, 10), btn.dataset.move === "up" ? -1 : 1);
+        await saveOutline(outline); renderOutlineEditor();
+      });
+    });
+    wrap.querySelectorAll("[data-del]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        outline.blocks.splice(parseInt(btn.dataset.del, 10), 1);
+        await saveOutline(outline); renderOutlineEditor();
+      });
+    });
+    $("#outlineCopyBtn").addEventListener("click", () => {
+      const text = outlineToText(outline);
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast("Copied as text"));
+    });
+    $("#outlineDeleteBtn").addEventListener("click", async () => {
+      if (!confirm(`Delete "${outline.title}"? This can't be undone.`)) return;
+      await deleteOutline(outline.id);
+      state.outlineEditingId = null;
+      renderOutlineListView();
+    });
+  }
+
+  function renderJournalView() {
+    $$("#journalModeToggle button").forEach((b) => b.classList.toggle("active", b.dataset.jmode === state.journalMode));
+    if (state.journalMode === "prayer") renderPrayerJournal();
+    else if (state.journalMode === "plan") renderPlanView();
+    else if (state.journalMode === "memory") renderMemoryView();
+    else if (state.journalMode === "outline") {
+      if (state.outlineEditingId) renderOutlineEditor();
+      else renderOutlineListView();
+    }
+  }
+
+  async function renderPrayerJournal() {
+    const wrap = $("#journalBody");
+    if (!wrap) return;
+    const prayers = await allPrayers();
+    const active = prayers.filter((p) => p.status !== "answered")
+      .sort((a, b) => (a.lastPrayedAt || 0) - (b.lastPrayedAt || 0));
+    const answered = prayers.filter((p) => p.status === "answered")
+      .sort((a, b) => (b.answeredAt || 0) - (a.answeredAt || 0));
+    const mins = getPrayerMinutes();
+    const running = !!prayerTimer.startedAt;
+
+    wrap.innerHTML = `
+      <div class="trcard">
+        ${running
+          ? `<div style="text-align:center">
+               <div id="prayerTimerDisplay" class="timer-face">00:00</div>
+               <div class="trcard-status" style="margin-bottom:10px">Praying \u2014 take your time.</div>
+               <button class="dl" id="prayerStopBtn" style="width:100%">Finish &amp; log</button>
+             </div>`
+          : `<div class="trcard-head">
+               <div>
+                 <div class="trcard-name">Prayer time</div>
+                 <div class="trcard-status">${mins ? `${mins} minute${mins === 1 ? "" : "s"} logged so far` : "No time logged yet"}</div>
+               </div>
+               <button class="dl" id="prayerStartBtn">Pray now</button>
+             </div>`}
+      </div>
+
+      <div class="testament-label" style="margin-top:20px">Requests${active.length ? ` (${active.length})` : ""}</div>
+      <form id="prayerAddForm" style="display:flex;gap:8px;margin-bottom:12px">
+        <input id="prayerAddInput" type="text" placeholder="What are you praying for?" autocomplete="off"
+          style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+        <button class="dl" type="submit">Add</button>
+      </form>
+      ${active.length ? active.map((p) => `
+        <div class="trcard prayer-row" data-id="${escapeHtml(p.id)}">
+          <div class="trcard-name" style="font-size:15.5px">${escapeHtml(p.title)}</div>
+          <div class="trcard-status">${escapeHtml(p.category || "Other")}${
+            p.lastPrayedAt ? ` \u00b7 last prayed ${relativeDay(p.lastPrayedAt)}`
+                           : ` \u00b7 added ${relativeDay(p.createdAt)}`}${
+            p.prayedCount ? ` \u00b7 ${p.prayedCount}\u00d7` : ""}</div>
+        </div>`).join("")
+        : `<div class="hint">Nothing here yet. Add a request above \u2014 it stays on your device only.</div>`}
+
+      ${answered.length ? `
+        <div class="testament-label" style="margin-top:20px">Answered (${answered.length})</div>
+        <div class="hint" style="margin-bottom:12px">A record worth keeping. It's easy to forget what's already been answered.</div>
+        ${answered.map((p) => `
+          <div class="trcard prayer-row answered-row" data-id="${escapeHtml(p.id)}">
+            <div class="trcard-name" style="font-size:15.5px">\u2728 ${escapeHtml(p.title)}</div>
+            <div class="trcard-status">Answered ${relativeDay(p.answeredAt)}${
+              p.createdAt && p.answeredAt ? ` \u00b7 carried ${Math.max(1, Math.floor((p.answeredAt - p.createdAt) / 86400000))} day${Math.max(1, Math.floor((p.answeredAt - p.createdAt) / 86400000)) === 1 ? "" : "s"}` : ""}</div>
+            ${p.answerNote ? `<div style="font-size:14px;line-height:1.5;margin-top:6px;color:var(--ink-soft)">${escapeHtml(p.answerNote)}</div>` : ""}
+          </div>`).join("")}` : ""}
+
+    `;
+
+    $("#prayerStartBtn")?.addEventListener("click", startPrayerTimer);
+    $("#prayerStopBtn")?.addEventListener("click", stopPrayerTimer);
+    $("#prayerAddForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const title = $("#prayerAddInput").value.trim();
+      if (!title) return;
+      await putPrayer({ id: "p_" + Date.now(), title, detail: "", category: "Other",
+        status: "active", createdAt: Date.now(), lastPrayedAt: null, prayedCount: 0,
+        answeredAt: null, answerNote: "" });
+      $("#prayerAddInput").value = "";
+      renderPrayerJournal();
+    });
+    wrap.querySelectorAll(".prayer-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const rec = prayers.find((p) => p.id === row.dataset.id);
+        if (rec) openPrayerSheet(rec);
+      });
+    });
   }
 
   async function renderConcordanceCard() {
@@ -3052,7 +3978,9 @@
     $("#strongsEntryBackdrop").classList.add("show");
   }
 
+  let xrefOrigin = null;
   async function openXrefSheet(bookName, chapter, verse) {
+    xrefOrigin = { book: bookName, chapter, verse };
     $("#xrefSheetRef").textContent = refLabel(bookName, chapter, verse, verse) + " \u2014 cross-references";
     $("#xrefSheetStatus").textContent = "Looking up\u2026";
     $("#xrefSheetList").innerHTML = "";
@@ -3080,6 +4008,9 @@
         if (!book) return;
         state.book = book; state.chapter = r.toChapter; state.verseFocus = r.toVerseStart;
         $("#xrefSheetBackdrop").classList.remove("show");
+        setReturnContext({ mode: state.searchMode, sheet: "xref",
+          payload: { book: xrefOrigin.book, chapter: xrefOrigin.chapter, verse: xrefOrigin.verse },
+          label: `${xrefOrigin.book} ${xrefOrigin.chapter}:${xrefOrigin.verse} cross-refs` });
         setView("read");
       });
     });
@@ -3098,10 +4029,12 @@
      that already has notes won't wipe them; on a conflict the imported
      copy wins for that specific verse/tab.
   ===================================================================== */
-  const BACKUP_FORMAT = 1;
+  const BACKUP_FORMAT = 3;
 
   async function buildBackupObject() {
-    const [highlights, notes] = await Promise.all([getAllHighlights(), getAllNotes()]);
+    const [highlights, notes, prayers, outlines, memVerses, planProgress] = await Promise.all([
+      getAllHighlights(), getAllNotes(), allPrayers(), getAllOutlines(), getAllMemoryVerses(), getAllPlanProgress(),
+    ]);
     return {
       format: BACKUP_FORMAT,
       app: "berea",
@@ -3110,6 +4043,12 @@
       tabs: loadTabs(),
       highlights: highlights.map((h) => ({ ref: h.ref, color: h.color })),
       notes: notes.map((n) => ({ ref: n.ref, text: n.text, updatedAt: n.updatedAt || null })),
+      prayers,
+      prayerMinutes: getPrayerMinutes(),
+      outlines,
+      memoryVerses: memVerses,
+      planProgress,
+      activePlan: localStorage.getItem("berea.activePlan") || null,
     };
   }
 
@@ -3178,25 +4117,111 @@
       });
     }
 
+    let prayersAdded = 0;
+    if (Array.isArray(json.prayers) && json.prayers.length) {
+      const db = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("prayers", "readwrite");
+        const store = tx.objectStore("prayers");
+        for (const p of json.prayers) {
+          if (!p || !p.id || !p.title) continue;
+          store.put(p);   // imported copy wins on conflict, same as tabs
+          prayersAdded++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    let outlinesAdded = 0;
+    if (Array.isArray(json.outlines) && json.outlines.length) {
+      const db = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("outlines", "readwrite");
+        const store = tx.objectStore("outlines");
+        for (const o of json.outlines) {
+          if (!o || !o.id || !o.title || !Array.isArray(o.blocks)) continue;
+          store.put(o);
+          outlinesAdded++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    let memoryAdded = 0;
+    if (Array.isArray(json.memoryVerses) && json.memoryVerses.length) {
+      const db = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("memoryVerses", "readwrite");
+        const store = tx.objectStore("memoryVerses");
+        for (const m of json.memoryVerses) {
+          if (!m || !m.ref || !m.text) continue;
+          store.put(m);
+          memoryAdded++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    let plansAdded = 0;
+    if (Array.isArray(json.planProgress) && json.planProgress.length) {
+      const db = await openDB();
+      // Read existing progress in its own transaction FIRST, rather than
+      // awaiting a get() inside the write loop below -- interleaving async
+      // reads with an open readwrite transaction risks the transaction
+      // auto-committing early in some browsers (Safari especially).
+      const existingAll = await idbReq(db.transaction("planProgress", "readonly").objectStore("planProgress").getAll());
+      const existingById = new Map(existingAll.map((p) => [p.planId, p]));
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("planProgress", "readwrite");
+        const store = tx.objectStore("planProgress");
+        for (const pr of json.planProgress) {
+          if (!pr || !pr.planId || !pr.completions) continue;
+          const existing = existingById.get(pr.planId);
+          // Merge completions rather than overwrite, so restoring an older
+          // backup can't erase progress made on this device since.
+          const merged = existing
+            ? Object.assign({}, pr, { completions: Object.assign({}, pr.completions, existing.completions) })
+            : pr;
+          store.put(merged);
+          plansAdded++;
+        }
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+    if (json.activePlan && !localStorage.getItem("berea.activePlan")) {
+      localStorage.setItem("berea.activePlan", json.activePlan);
+    }
+    // Logged prayer time is cumulative, so keep whichever total is higher
+    // rather than letting a restore erase time already logged here.
+    if (typeof json.prayerMinutes === "number" && json.prayerMinutes > getPrayerMinutes()) {
+      localStorage.setItem("berea.prayerMinutes", String(json.prayerMinutes));
+    }
+
     if (json.name && !localStorage.getItem("berea.name")) {
       localStorage.setItem("berea.name", json.name);
     }
 
     renderTabStrip();
-    return { tabsAdded, hlAdded, notesAdded };
+    return { tabsAdded, hlAdded, notesAdded, prayersAdded, outlinesAdded, memoryAdded, plansAdded };
   }
 
   async function renderBackupPanel() {
     const wrap = $("#backupPanel");
     if (!wrap) return;
-    const [highlights, notes] = await Promise.all([getAllHighlights(), getAllNotes()]);
+    const [highlights, notes, prayers, outlines, memVerses] = await Promise.all([
+      getAllHighlights(), getAllNotes(), allPrayers(), getAllOutlines(), getAllMemoryVerses(),
+    ]);
     const tabCount = loadTabs().length;
     wrap.innerHTML = `
       <div class="trcard">
         <div class="trcard-head">
           <div>
             <div class="trcard-name">Your study data</div>
-            <div class="trcard-status">${tabCount} tab${tabCount === 1 ? "" : "s"} \u00b7 ${highlights.length} highlight${highlights.length === 1 ? "" : "s"} \u00b7 ${notes.length} note${notes.length === 1 ? "" : "s"}</div>
+            <div class="trcard-status">${tabCount} tab${tabCount === 1 ? "" : "s"} \u00b7 ${highlights.length} highlight${highlights.length === 1 ? "" : "s"} \u00b7 ${notes.length} note${notes.length === 1 ? "" : "s"} \u00b7 ${prayers.length} prayer${prayers.length === 1 ? "" : "s"} \u00b7 ${outlines.length} outline${outlines.length === 1 ? "" : "s"} \u00b7 ${memVerses.length} memory verse${memVerses.length === 1 ? "" : "s"}</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px">
@@ -3221,7 +4246,8 @@
       try {
         const text = await file.text();
         const result = await restoreBackup(JSON.parse(text));
-        toast(`Restored ${result.tabsAdded} tabs, ${result.hlAdded} highlights, ${result.notesAdded} notes`);
+        toast(`Restored ${result.tabsAdded} tabs, ${result.hlAdded} highlights, ${result.notesAdded} notes, ${result.prayersAdded} prayers, ${result.outlinesAdded} outlines, ${result.memoryAdded} memory verses`);
+        if (state.journalMode) renderJournalView();
         renderBackupPanel();
         if (state.view === "read") renderRead();
       } catch (e) {
@@ -3250,7 +4276,9 @@
         <li><strong>Write a note.</strong> Notes save whichever way you close the menu, so nothing gets lost. A small ✎ appears on any verse that has one.</li>
         <li><strong>Pin it as a tab</strong>, or add it to an existing tab.</li>
         <li><strong>Look up cross-references</strong>, either the traditional set or an AI prompt.</li>
-      </ul>` },
+        <li><strong>Add it to memory verses</strong> for spaced-repetition practice \u2014 see it under Journal.</li>
+      </ul>
+      <p>The 🔊 button at the top of the chapter reads it aloud, one verse at a time, highlighting each as it goes.</p>` },
 
     { id: "h-compare", title: "Compare — two translations side by side", body: `
       <p>The <strong>Compare</strong> tab shows the same chapter in two translations as facing pages, like an open book. Pick a translation per page from the dropdowns.</p>
@@ -3275,7 +4303,16 @@
       <p>The <strong>Study</strong> tab starts a shared session. Tap <em>Start a Study</em>, then send the link over any messaging app — whoever opens it joins straight away, no code to type.</p>
       <p><strong>Leading:</strong> whoever leads moves the group through the passage. Anyone can tap <em>Take the lead</em>, and anyone can switch off <em>Follow along</em> to wander on their own.</p>
       <p><strong>Sharing marks</strong> is off by default. Switch it on and your highlights and notes go to everyone else who also has it on, and theirs come to you. Leave it off to mark up privately. If you turn it on mid-study, <em>Send my existing marks</em> catches the group up on the current chapter.</p>
-      <p>Everyone connects directly to everyone else, so the session keeps going even if the person who started it closes their tab. Reopening the same link rejoins.</p>` },
+      <p>Everyone connects directly to everyone else, so the session keeps going even if the person who started it closes their tab. Reopening the same link rejoins.</p>
+      <p>When you leave, if the group covered any ground, you'll get a <strong>recap</strong> \u2014 passages visited and tabs pinned during the session, ready to copy and share. It's yours alone; each person's recap reflects what they had open, and it's never sent to anyone automatically.</p>` },
+
+    { id: "h-journal", title: "Journal \u2014 prayer and your own work", body: `
+      <p>The <strong>Journal</strong> tab is for what you bring rather than what you read. It has four parts, switched with the strip at the top: <em>Prayer</em>, <em>Plan</em>, <em>Memory</em>, and <em>Outlines</em>.</p>
+      <p><strong>Prayer</strong> \u2014 add a request in a line of text. Tap it to add detail, note that you prayed for it, set a category, or mark it answered. Requests you haven't prayed for in a while drift to the top, so nothing quietly falls off the list. Answered prayers get their own section with how long you carried each one, plus room to write down what happened \u2014 it's genuinely easy to forget what's already been answered. <em>Pray now</em> runs a simple timer and logs the minutes. There are no streaks or targets here on purpose: streaks suit a daily habit, but attached to prayer they'd turn it into score-keeping, and a broken streak becomes guilt about praying.</p>
+      <p><strong>Plan</strong> \u2014 pick a reading plan (Whole Bible in a year, New Testament in 90 days, the Gospels in a month, and others) and it shows you today's assignment, one tap from the reading itself. This is where streaks belong \u2014 a daily-habit goal is exactly what they're for.</p>
+      <p><strong>Memory</strong> \u2014 verses you've chosen to memorize (add one from any verse's menu while reading) come up for review on a spaced schedule: sooner after you add them, further apart each time you get one right. Practice shows the verse with a growing share of words blanked out as you review it more.</p>
+      <p><strong>Outlines</strong> \u2014 build a document mixing your own headings and points with verses, in whatever order you'll actually use it \u2014 teaching, leading a study, or thinking a passage through. Reorder blocks with the arrows, and copy the whole thing as plain text when you're ready to use it elsewhere.</p>
+      <p>All of it stays on your device, and prayers, memory verses, and outlines are included in your backup file.</p>` },
 
     { id: "h-original", title: "Hebrew and Greek", body: `
       <p>Two separate things, both under <em>Hebrew &amp; Greek</em> below:</p>
@@ -3295,7 +4332,7 @@
       <p>Save any of them as a tab to have the verses side by side while you think it through.</p>` },
 
     { id: "h-backup", title: "Backing up your work", body: `
-      <p>Your tabs, highlights, and notes live <strong>only in this browser</strong>. Clearing site data or switching devices loses them, so save a backup file from <em>Backup &amp; restore</em> below now and then.</p>
+      <p>Your tabs, highlights, notes, and prayer journal live <strong>only in this browser</strong>. Clearing site data or switching devices loses them, so save a backup file from <em>Backup &amp; restore</em> below now and then.</p>
       <p>Restoring <strong>merges</strong> rather than replaces — it won't wipe work already on the device. Where both have something for the same verse, the file being restored wins.</p>
       <p>Backups deliberately leave out downloaded scripture, dictionaries, and cross-references, since those are large and easy to download again.</p>` },
 
@@ -3424,6 +4461,59 @@
     roster: new Map(),       // peerId -> { name }
   };
 
+  /* ---------------------------------------------------------------------
+     Session recap
+     ---------------------------------------------------------------------
+     A personal, local record of what a study actually covered -- never
+     synced, since each participant's own experience of the session (what
+     they had open, when they joined) can legitimately differ. Only counts
+     passages that were part of the GROUP's path: broadcast as leader, or
+     received while following. Independently wandering off with "Follow
+     along" switched off doesn't pollute the record of what was studied
+     together.
+  --------------------------------------------------------------------- */
+  const sessionLog = { startedAt: null, passages: [], tabIds: new Set(), tabLabels: [] };
+
+  function sessionLogStart() {
+    sessionLog.startedAt = Date.now();
+    sessionLog.passages = [];
+    sessionLog.tabIds = new Set();
+    sessionLog.tabLabels = [];
+  }
+  function sessionLogPassage(bookName, chapter) {
+    if (!sessionLog.startedAt) return;
+    const last = sessionLog.passages[sessionLog.passages.length - 1];
+    if (last && last.book === bookName && last.chapter === chapter) return; // no consecutive dupes
+    sessionLog.passages.push({ book: bookName, chapter, at: Date.now() });
+  }
+  function sessionLogTab(tabObj) {
+    if (!sessionLog.startedAt || !tabObj || sessionLog.tabIds.has(tabObj.id)) return;
+    sessionLog.tabIds.add(tabObj.id);
+    sessionLog.tabLabels.push(tabObj.label);
+  }
+
+  function buildSessionRecap() {
+    const mins = sessionLog.startedAt ? Math.max(1, Math.round((Date.now() - sessionLog.startedAt) / 60000)) : 0;
+    const names = Array.from(mesh.roster.values()).map((v) => v.name).concat([mesh.myName]).filter(Boolean);
+    const lines = [
+      `Study recap \u2014 ${new Date().toLocaleDateString()}`,
+      `${mins} minute${mins === 1 ? "" : "s"} \u00b7 ${names.length} participant${names.length === 1 ? "" : "s"}: ${names.join(", ")}`,
+      "",
+    ];
+    if (sessionLog.passages.length) {
+      lines.push("Passages covered:");
+      for (const p of sessionLog.passages) lines.push(`  \u2022 ${p.book} ${p.chapter}`);
+    } else {
+      lines.push("No passages were tracked as part of the group's path.");
+    }
+    if (sessionLog.tabLabels.length) {
+      lines.push("", "Tabs pinned during the study:");
+      for (const t of sessionLog.tabLabels) lines.push(`  \u2022 ${t}`);
+    }
+    return { text: lines.join("\n"), minutes: mins, passageCount: sessionLog.passages.length,
+      tabCount: sessionLog.tabLabels.length, participants: names };
+  }
+
   function getMyName() {
     let name = localStorage.getItem("berea.name");
     if (!name) {
@@ -3507,6 +4597,7 @@
           if (book) {
             state.book = book; state.chapter = msg.chapter; state.verseFocus = null;
             setView("read");
+            sessionLogPassage(book.name, msg.chapter);
           }
         }
         break;
@@ -3525,6 +4616,7 @@
           saveTabs(tabs);
           renderTabStrip();
         }
+        sessionLogTab(msg.tab);
         break;
       }
       case "tab-update": {
@@ -3616,6 +4708,7 @@
       mesh.leaderId = id; mesh.isLeader = true; mesh.following = true;
       wirePeerEvents();
       location.hash = "study=" + code;
+      sessionLogStart();
       renderStudyView();
       toast("Study started");
     } catch (e) {
@@ -3644,6 +4737,7 @@
       });
       conn.on("error", () => { if (!responded) toast("Couldn't find that study — check the code and try again."); });
       location.hash = "study=" + code;
+      sessionLogStart();
       renderStudyView();
     } catch (e) {
       toast("Couldn't join the study — check your connection and try again.");
@@ -3651,14 +4745,29 @@
   }
 
   function leaveStudy() {
+    // Snapshot before mesh state clears, since the recap reads the roster
+    // and session log that are about to be reset.
+    const elapsedMs = sessionLog.startedAt ? Date.now() - sessionLog.startedAt : 0;
+    const hasContent = sessionLog.passages.length > 0 || sessionLog.tabLabels.length > 0;
+    const recap = (sessionLog.startedAt && (hasContent || elapsedMs > 30000)) ? buildSessionRecap() : null;
+
     mesh.connections.forEach((conn) => { try { conn.close(); } catch (e) {} });
     if (mesh.peer) { try { mesh.peer.destroy(); } catch (e) {} }
     mesh.active = false; mesh.roomCode = null; mesh.peer = null;
     mesh.connections.clear(); mesh.roster.clear();
     mesh.leaderId = null; mesh.isLeader = false; mesh.isHost = false;
     mesh.shareMarkup = false; // never carries over into the next session
+    sessionLog.startedAt = null;
     history.replaceState(null, "", location.pathname + location.search);
     renderStudyView();
+    if (recap) openRecapSheet(recap);
+  }
+
+  function openRecapSheet(recap) {
+    $("#recapStatus").textContent =
+      `${recap.minutes} minute${recap.minutes === 1 ? "" : "s"} \u00b7 ${recap.passageCount} passage${recap.passageCount === 1 ? "" : "s"} \u00b7 ${recap.tabCount} tab${recap.tabCount === 1 ? "" : "s"} pinned`;
+    $("#recapText").value = recap.text;
+    $("#recapBackdrop").classList.add("show");
   }
 
   function takeLead() {
@@ -3671,8 +4780,13 @@
   function broadcastNavIfLeader() {
     if (!mesh.active || !mesh.isLeader) return;
     meshBroadcast({ t: "nav", book: state.book.name, chapter: state.chapter });
+    sessionLogPassage(state.book.name, state.chapter);
   }
-  function broadcastTabAdd(tabObj) { if (mesh.active) meshBroadcast({ t: "tab-add", tab: tabObj }); }
+  function broadcastTabAdd(tabObj) {
+    if (!mesh.active) return;
+    meshBroadcast({ t: "tab-add", tab: tabObj });
+    sessionLogTab(tabObj);
+  }
   function broadcastTabUpdate(tabId, refs) { if (mesh.active) meshBroadcast({ t: "tab-update", tabId, refs }); }
   // Notes/highlights sync is Pass 2 — these are the send-side hooks, wired
   // in now so every save path already calls them. Receive handlers land next.
@@ -3857,6 +4971,7 @@
     renderStrongsSearchResults(await searchStrongsDict(q));
   });
 
+  $("#listenBtn").addEventListener("click", toggleReadAloud);
   $("#strongsModeBtn").addEventListener("click", () => {
     state.strongsMode = !state.strongsMode;
     $("#strongsModeBtn").classList.toggle("on", state.strongsMode);
@@ -3875,14 +4990,22 @@
 
   $("#searchForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
+    state.searchQueries.verses = $("#searchInput").value;
     runSearch($("#searchTr").value, $("#searchInput").value);
   });
   $("#tabSearchForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     runTabSearch($("#tabSearchInput").value);
   });
-  $("#tabSearchInput").addEventListener("input", () => runTabSearch($("#tabSearchInput").value));
-  $("#wordSearchForm").addEventListener("submit", (ev) => { ev.preventDefault(); runWordSearch($("#wordSearchInput").value); });
+  $("#tabSearchInput").addEventListener("input", () => {
+    state.searchQueries.tabs = $("#tabSearchInput").value;
+    runTabSearch($("#tabSearchInput").value);
+  });
+  $("#wordSearchForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    state.searchQueries.words = $("#wordSearchInput").value;
+    runWordSearch($("#wordSearchInput").value);
+  });
   $("#wordSheetClose").addEventListener("click", () => $("#wordSheetBackdrop").classList.remove("show"));
   $("#wordSheetBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "wordSheetBackdrop") $("#wordSheetBackdrop").classList.remove("show"); });
   $("#wordSaveTab").addEventListener("click", () => {
@@ -3901,8 +5024,101 @@
     toast("Tab created");
   });
   $("#menuBtn").addEventListener("click", () => setView("library"));
+
+  /* ---- session recap ---- */
+  $("#recapCopyBtn").addEventListener("click", () => {
+    if (navigator.clipboard) navigator.clipboard.writeText($("#recapText").value).then(() => toast("Recap copied"));
+  });
+  $("#recapCloseBtn").addEventListener("click", () => $("#recapBackdrop").classList.remove("show"));
+  $("#recapBackdrop").addEventListener("click", (ev) => {
+    if (ev.target.id === "recapBackdrop") $("#recapBackdrop").classList.remove("show");
+  });
+
+
+  /* ---- memory verse practice ---- */
+  $("#memRevealBtn").addEventListener("click", () => {
+    const card = memoryQueue[memoryIdx];
+    if (!card) return;
+    $("#memPracticeText").innerHTML =
+      `<div style="font-size:17px;line-height:1.75;font-family:var(--font-serif)">${escapeHtml(blankVerseText(card.text, card.reviewCount))}</div>`;
+    $("#memRevealBtn").style.display = "none";
+    $("#memRatingRow").style.display = "block";
+  });
+  $$(".mem-rate").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const card = memoryQueue[memoryIdx];
+      if (!card) return;
+      const updated = Object.assign({}, card, scheduleNext(card, btn.dataset.rating), { lastReviewed: Date.now() });
+      await saveMemCard(updated);
+      memoryIdx++;
+      showMemoryCard();
+    });
+  });
+  $("#memPracticeClose").addEventListener("click", () => {
+    $("#memPracticeBackdrop").classList.remove("show");
+    renderMemoryView();
+  });
+  $("#memPracticeBackdrop").addEventListener("click", (ev) => {
+    if (ev.target.id === "memPracticeBackdrop") { $("#memPracticeBackdrop").classList.remove("show"); renderMemoryView(); }
+  });
+
+
+  /* ---- prayer sheet ---- */
+  $("#prayerCategorySel").innerHTML =
+    PRAYER_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
+  $("#prayerSheetClose").addEventListener("click", closePrayerSheet);
+  $("#prayerSheetBackdrop").addEventListener("click", (ev) => {
+    if (ev.target.id === "prayerSheetBackdrop") closePrayerSheet();
+  });
+  $("#prayerMarkPrayed").addEventListener("click", async () => {
+    if (!currentPrayer) return;
+    currentPrayer.lastPrayedAt = Date.now();
+    currentPrayer.prayedCount = (currentPrayer.prayedCount || 0) + 1;
+    currentPrayer.detail = $("#prayerSheetDetail").value;
+    await putPrayer(currentPrayer);
+    $("#prayerSheetBackdrop").classList.remove("show");
+    toast("Noted");
+    renderPrayerJournal();
+  });
+  $("#prayerMarkAnswered").addEventListener("click", async () => {
+    if (!currentPrayer) return;
+    currentPrayer.detail = $("#prayerSheetDetail").value;
+    if (currentPrayer.status === "answered") {
+      currentPrayer.status = "active";
+      currentPrayer.answeredAt = null;
+      await putPrayer(currentPrayer);
+      $("#prayerSheetBackdrop").classList.remove("show");
+      renderPrayerJournal();
+      return;
+    }
+    currentPrayer.status = "answered";
+    currentPrayer.answeredAt = Date.now();
+    currentPrayer.answerNote = $("#prayerSheetAnswer").value;
+    await putPrayer(currentPrayer);
+    $("#prayerSheetBackdrop").classList.remove("show");
+    const carried = Math.max(1, Math.floor((currentPrayer.answeredAt - currentPrayer.createdAt) / 86400000));
+    toast(`Answered \u2728 \u2014 carried ${carried} day${carried === 1 ? "" : "s"}`);
+    renderPrayerJournal();
+  });
+  $("#prayerCategorySel").addEventListener("change", async (ev) => {
+    if (!currentPrayer) return;
+    currentPrayer.category = ev.target.value;
+    await putPrayer(currentPrayer);
+    renderPrayerJournal();
+  });
+  $("#prayerDeleteBtn").addEventListener("click", async () => {
+    if (!currentPrayer) return;
+    if (!confirm(`Delete \u201c${currentPrayer.title}\u201d? This can't be undone.`)) return;
+    await deletePrayer(currentPrayer.id);
+    currentPrayer = null;
+    $("#prayerSheetBackdrop").classList.remove("show");
+    renderPrayerJournal();
+  });
   $("#topicSearchForm").addEventListener("submit", (ev) => { ev.preventDefault(); runTopicSearch($("#topicSearchInput").value); });
-  $("#topicSearchInput").addEventListener("input", () => runTopicSearch($("#topicSearchInput").value));
+  $("#topicSearchInput").addEventListener("input", () => {
+    state.searchQueries.topics = $("#topicSearchInput").value;
+    runTopicSearch($("#topicSearchInput").value);
+  });
   $("#topicSheetClose").addEventListener("click", () => $("#topicSheetBackdrop").classList.remove("show"));
   $("#topicSheetBackdrop").addEventListener("click", (ev) => { if (ev.target.id === "topicSheetBackdrop") $("#topicSheetBackdrop").classList.remove("show"); });
   $("#topicSaveTab").addEventListener("click", () => {
@@ -3926,6 +5142,9 @@
   });
   $$("#searchModeToggle button").forEach((btn) => {
     btn.addEventListener("click", () => setSearchMode(btn.dataset.mode));
+  });
+  $$("#journalModeToggle button").forEach((btn) => {
+    btn.addEventListener("click", () => { state.journalMode = btn.dataset.jmode; renderJournalView(); });
   });
 
   /* =====================================================================
