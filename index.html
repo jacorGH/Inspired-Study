@@ -229,6 +229,9 @@
   }
   .outline-heading { background: var(--page-dim); border-color: var(--gilt-soft); }
   .outline-verse { border-left: 3px solid var(--gilt); }
+  .outline-question { border-left: 3px solid var(--cover-light); background: var(--page-dim); }
+  .outline-block[data-edit] { cursor: pointer; }
+  .outline-block[data-edit]:active { background: var(--gilt-soft); }
   .outline-controls {
     position: absolute; right: 6px; top: 6px; display: flex; gap: 2px;
   }
@@ -327,6 +330,27 @@
   .page + .page {
     border-left: 1px solid var(--line);
     box-shadow: inset 6px 0 10px -8px var(--spine-a);
+  }
+  /* Tabs with more than two passages: the facing-page metaphor (and its
+     reliance on a horizontal swipe to find the rest) stops working once
+     there's a third pane, since nothing on screen hints more exist off to
+     the side. Stack vertically instead -- normal scrolling, discoverable,
+     and every passage is visible without hunting for a swipe. */
+  .spread.stacked {
+    flex-direction: column;
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+  .spread.stacked .page {
+    flex: 1 1 auto;
+    max-width: 100%;
+    box-shadow: none;
+    border-left: none;
+  }
+  .spread.stacked .page + .page {
+    border-left: none;
+    border-top: 1px solid var(--line);
+    box-shadow: none;
   }
   .page:first-child { box-shadow: inset -6px 0 10px -8px var(--spine-a); }
   .page-head {
@@ -888,6 +912,28 @@
     <div class="sheet-actions" style="margin-top:10px">
       <button class="primary" id="recapCopyBtn">Copy recap</button>
       <button class="ghost" id="recapCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Outline import (topic or existing text -> AI -> JSON -> app) -->
+<div id="outlineImportBackdrop" class="sheet-backdrop">
+  <div class="sheet wide-sheet">
+    <div class="sheet-ref">Import an outline</div>
+    <div class="sheet-text">Paste a topic ("Emmanuel: God With Us") or an existing outline you already have \u2014 from ChatGPT, Claude, notes, anywhere.</div>
+    <textarea id="outlineImportInput" class="ai-textarea" style="height:90px" placeholder="A topic, or an existing outline to convert\u2026"></textarea>
+    <button class="dl" id="outlineBuildPromptBtn" style="width:100%;margin:8px 0 4px">Build prompt</button>
+    <div id="outlineImportPasteWrap" style="display:none">
+      <div class="sheet-text" style="margin-top:10px">Copy this into any AI chat:</div>
+      <textarea id="outlineImportPrompt" class="ai-textarea" style="height:100px" readonly></textarea>
+      <button class="dl" id="outlineCopyPromptBtn" style="width:100%;margin:8px 0 14px">Copy prompt</button>
+      <div class="sheet-text" style="margin-bottom:6px">Paste the AI's JSON reply here:</div>
+      <textarea id="outlineImportPaste" class="ai-textarea" placeholder="Paste the JSON response\u2026"></textarea>
+      <button class="dl" id="outlineDoImportBtn" style="width:100%;margin-top:8px">Import</button>
+    </div>
+    <div class="sheet-text" id="outlineImportStatus" style="margin-top:10px"></div>
+    <div class="sheet-actions" style="margin-top:10px">
+      <button class="ghost" id="outlineImportClose">Close</button>
     </div>
   </div>
 </div>
@@ -2130,6 +2176,14 @@
      talking over whatever's on screen next.
   ===================================================================== */
   const reading = { active: false, paused: false, verses: [], idx: 0 };
+  // Snapshot of the verses currently on screen, refreshed by renderRead().
+  // toggleReadAloud() reads from this SYNCHRONOUSLY rather than awaiting a
+  // fresh fetch -- WebKit (Safari/iOS) requires speechSynthesis.speak() to
+  // fire within the same synchronous tick as the triggering tap, or it
+  // silently drops the request with no error. An `await` before the first
+  // speak() call is enough to lose that association, which is almost
+  // certainly why read-aloud produced no audio.
+  let lastReadRows = null;
 
   function speechSupported() {
     return typeof window !== "undefined" && "speechSynthesis" in window;
@@ -2164,8 +2218,28 @@
   async function toggleReadAloud() {
     if (!speechSupported()) { toast("This browser can't read text aloud."); return; }
     if (reading.active) { stopReading(); return; }
-    const rows = await getChapterVerses(state.readTr, state.book, state.chapter);
-    if (!rows.length) { toast("Nothing loaded to read yet."); return; }
+    const cached = lastReadRows;
+    const fresh = cached && cached.tr === state.readTr && cached.book === state.book.name && cached.chapter === state.chapter;
+    if (fresh && cached.rows.length) {
+      // Fast path, and the one that runs almost every time: the chapter is
+      // already on screen, so nothing here awaits anything. speak() fires
+      // synchronously within this same click handler.
+      startReadingRows(cached.rows);
+      return;
+    }
+    // Rare fallback -- e.g. Listen tapped before the chapter finished its
+    // first render. This path does await, so on Safari/iOS the browser may
+    // silently decline to produce audio even though nothing here errors.
+    // Load the text now and say so plainly rather than fail without
+    // explanation; a second tap immediately after will take the fast path.
+    toast("Loading the chapter — tap Listen again in a moment.");
+    try {
+      const rows = await getChapterVerses(state.readTr, state.book, state.chapter);
+      if (rows.length) lastReadRows = { tr: state.readTr, book: state.book.name, chapter: state.chapter, rows };
+    } catch (e) { /* toggleReadAloud will just report "nothing to read" on retry */ }
+  }
+
+  function startReadingRows(rows) {
     reading.active = true;
     reading.paused = false;
     reading.verses = rows;
@@ -2191,6 +2265,7 @@
         $("#readBody").innerHTML = `<div class="hint">Couldn't load this chapter (offline, and not cached yet). Try again once you're back online, or download ${state.readTr} in Library for full offline access.</div>`;
         return;
       }
+      lastReadRows = { tr: state.readTr, book: state.book.name, chapter: state.chapter, rows };
       let tokenMap = null;
       if (state.strongsMode) {
         tokenMap = await getTaggedChapter(state.book.name, state.chapter);
@@ -2286,10 +2361,12 @@
 
   async function renderTabView(tab) {
     $("#refBtn").textContent = tab.label;
+    const stacked = tab.refs.length > 2;
     $("#tabViewHead").innerHTML = `
       <h1 class="chapter-title" style="margin-bottom:4px">${escapeHtml(tab.label)}</h1>
-      <div class="hint" style="margin-bottom:12px">Reading in <strong>${tab.translationId}</strong> — cross-referenced passages, side by side.</div>`;
+      <div class="hint" style="margin-bottom:12px">Reading in <strong>${tab.translationId}</strong> — ${tab.refs.length} passages${stacked ? "" : ", side by side"}.</div>`;
     const spread = $("#tabSpread");
+    spread.classList.toggle("stacked", stacked);
     spread.innerHTML = tab.refs.map((r, i) => `
       <div class="page">
         <div class="page-title">${refLabel(r.book, r.chapter, r.verseStart, r.verseEnd)}</div>
@@ -2960,15 +3037,35 @@
     return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
   }
 
-  function parseAiSuggestions(raw) {
-    let text = String(raw || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
-    let data;
-    try { data = JSON.parse(text); }
-    catch (e) {
-      const m = text.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error("Couldn't understand the AI's response.");
-      try { data = JSON.parse(m[0]); } catch (e2) { throw new Error("Couldn't understand the AI's response."); }
+  // Shared repair core for anything pasted back from an AI chat. AI-
+  // generated "JSON" reliably has one specific problem: curly/smart double
+  // quotes (\u201c \u201d) where the AI meant straight ones -- as the actual
+  // JSON delimiters, or as an unescaped quote inside a text field that
+  // prematurely closes the string. Plain JSON.parse rejects both outright
+  // with an unhelpful "Unexpected token" error.
+  //
+  // Normalizing curly-to-straight quotes only happens AFTER a first parse
+  // attempt fails, never before: curly quotes are also completely
+  // legitimate as ordinary content inside an already-valid JSON string (a
+  // quoted phrase within a note or a discussion question, say), and
+  // rewriting those pre-emptively would turn valid JSON into broken JSON
+  // instead of the other way round. Returns null rather than throwing, so
+  // each caller can raise its own, more specific error message.
+  function parseAiJsonLoose(raw) {
+    const stripped = String(raw || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
+    const normalizeQuotes = (s) => s.replace(/[\u201C\u201D]/g, '"');
+    const tryParse = (s) => { try { return JSON.parse(s); } catch (e) { return null; } };
+    let data = tryParse(stripped) || tryParse(normalizeQuotes(stripped));
+    if (!data) {
+      const m = stripped.match(/\{[\s\S]*\}/);
+      if (m) data = tryParse(m[0]) || tryParse(normalizeQuotes(m[0]));
     }
+    return data;
+  }
+
+  function parseAiSuggestions(raw) {
+    const data = parseAiJsonLoose(raw);
+    if (!data) throw new Error("Couldn't understand the AI's response \u2014 the most common cause is a curly quotation mark where a straight one was needed. Try asking the AI to resend it with plain ASCII quotes.");
     const list = (data && Array.isArray(data.suggestions)) ? data.suggestions : [];
     const out = [];
     for (const s of list) {
@@ -2985,7 +3082,7 @@
   }
 
   function buildCorrelationPrompt(refText, passageText) {
-    return "You are assisting with Bible study cross-referencing in an app called Berea. For this passage \u2014 " + refText + ': "' + passageText + '" \u2014 suggest up to 6 genuinely illuminating cross-references: verses that quote it, are quoted by it, fulfill it, parallel it thematically, or form an \u201cundesigned coincidence\u201d (an incidental detail in another passage that interlocks with this one in a way that looks unplanned, sometimes used as evidence of authenticity). For each, give one short sentence on why it connects. Respond with ONLY valid JSON, no markdown fences, no commentary before or after, in exactly this shape: {"suggestions":[{"reference":"Book Chapter:Verse","note":"...","type":"cross-reference"}]}. Use "type" values only from: cross-reference, thematic, undesigned-coincidence.';
+    return "You are assisting with Bible study cross-referencing in an app called Berea. For this passage \u2014 " + refText + ': "' + passageText + '" \u2014 suggest up to 6 genuinely illuminating cross-references: verses that quote it, are quoted by it, fulfill it, parallel it thematically, or form an \u201cundesigned coincidence\u201d (an incidental detail in another passage that interlocks with this one in a way that looks unplanned, sometimes used as evidence of authenticity). For each, give one short sentence on why it connects. Respond with ONLY valid JSON, no markdown fences, no commentary before or after, in exactly this shape: {"suggestions":[{"reference":"Book Chapter:Verse","note":"...","type":"cross-reference"}]}. Use "type" values only from: cross-reference, thematic, undesigned-coincidence. Use plain straight ASCII double quotes only for JSON syntax \u2014 if a note needs to show a quoted phrase, use curly quotes (\u201clike this\u201d) instead of straight ones so it can\u2019t be confused with the JSON delimiters.';
   }
 
   async function queryAiForCorrelations(refText, passageText) {
@@ -3570,7 +3667,9 @@
     const lines = [outline.title, "=".repeat(outline.title.length), ""];
     for (const b of outline.blocks) {
       if (b.type === "heading") lines.push("", b.text.toUpperCase(), "-".repeat(b.text.length));
+      else if (b.type === "text") lines.push("", b.text);
       else if (b.type === "point") lines.push("  \u2022 " + b.text);
+      else if (b.type === "question") lines.push("  ? " + b.text);
       else if (b.type === "verse") {
         lines.push("", `  ${refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd)} (${b.translationId})`,
           "  \u201c" + b.text + "\u201d");
@@ -3579,13 +3678,95 @@
     return lines.join("\n");
   }
 
+  // JSON export mirrors the import schema exactly, so a round trip (export,
+  // hand-edit or run through an AI, re-import) works. Verse blocks export as
+  // a bare reference string, not the verse text -- the text is re-resolved
+  // on import from whichever translation is current then, matching how
+  // adding a verse block manually already works.
+  function outlineToJson(outline) {
+    return JSON.stringify({
+      title: outline.title,
+      blocks: outline.blocks.map((b) => b.type === "verse"
+        ? { type: "verse", reference: refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd) }
+        : { type: b.type, text: b.text }),
+    }, null, 2);
+  }
+
+  const OUTLINE_BLOCK_TYPES = ["heading", "text", "point", "question", "verse"];
+
+  function buildOutlinePrompt(input) {
+    return `You are helping build a structured Bible study outline for an app called Berea. Below is either a TOPIC to build a new outline about, or an EXISTING outline or study guide to convert into the app's format \u2014 use your judgement about which it is.
+
+INPUT:
+"""
+${input}
+"""
+
+Produce a thorough, well-organized study outline as ONLY valid JSON, no markdown fences, no commentary before or after, in exactly this shape:
+{"title":"...","blocks":[
+  {"type":"heading","text":"Section title"},
+  {"type":"text","text":"Explanatory prose, a theme statement, or a closing thought"},
+  {"type":"point","text":"A teaching point"},
+  {"type":"question","text":"A discussion question"},
+  {"type":"verse","reference":"Book Chapter:Verse"}
+]}
+Use "type" values only from: heading, text, point, question, verse. For "verse" blocks give ONLY the reference in the "reference" field \u2014 do not include the verse's wording, since the app looks up the actual text itself from its own Bible data. If converting an existing outline, preserve its structure and content rather than summarizing it. If building one from a topic, include several sections, each with teaching points, at least one verse, and a couple of discussion questions.
+
+Use plain straight ASCII double quotes (") only for JSON syntax \u2014 never curly/smart quotes (\u201c \u201d) for that. If any text field itself needs to show a quoted phrase, use curly quotes for it (like \u201cthis\u201d) rather than straight ones, so it can never be confused with the JSON delimiters around it.`;
+  }
+
+  // Parses the AI's reply and validates the outline-specific shape;
+  // quote-repair itself lives in the shared parseAiJsonLoose (see its
+  // comment for why the repair only runs after a first attempt fails).
+  function parseOutlineJson(raw) {
+    const data = parseAiJsonLoose(raw);
+    if (!data) {
+      throw new Error("That JSON didn't parse \u2014 the most common cause is a curly/smart quotation mark where the AI needed a plain one, often inside a quoted phrase in one of the text fields. Try asking the AI to resend it using only straight ASCII quotes, or fix the specific line the AI's reply points to.");
+    }
+    if (typeof data.title !== "string" || !data.title.trim()) throw new Error("Missing a \u201ctitle\u201d field.");
+    if (!Array.isArray(data.blocks)) throw new Error("Missing a \u201cblocks\u201d array.");
+    return data;
+  }
+
+  // Converts validated-shape JSON into real outline blocks, resolving verse
+  // references through the app's own parser and fetching text from the
+  // current translation -- the AI supplies structure and its own prose, the
+  // app supplies scripture, never the other way round.
+  async function buildBlocksFromJson(data) {
+    const blocks = [];
+    let skippedRefs = 0, skippedOther = 0;
+    for (const b of data.blocks) {
+      if (!b || !OUTLINE_BLOCK_TYPES.includes(b.type)) { skippedOther++; continue; }
+      if (b.type === "verse") {
+        const parsed = parseReference(String(b.reference || ""));
+        if (!parsed) { skippedRefs++; continue; }
+        let text = "(couldn't load text)";
+        try {
+          const rows = await getChapterVerses(state.readTr, parsed.book, parsed.chapter);
+          const vs = parsed.verseStart ? rows.filter((r) => r.verse >= parsed.verseStart && r.verse <= parsed.verseEnd) : rows;
+          text = vs.map((r) => r.text).join(" ") || text;
+        } catch (e) { /* keep the placeholder */ }
+        blocks.push({ id: "b_" + Date.now() + "_" + blocks.length, type: "verse", translationId: state.readTr,
+          ref: { book: parsed.book.name, chapter: parsed.chapter, verseStart: parsed.verseStart || 1, verseEnd: parsed.verseEnd || 1 },
+          text });
+      } else {
+        if (typeof b.text !== "string" || !b.text.trim()) { skippedOther++; continue; }
+        blocks.push({ id: "b_" + Date.now() + "_" + blocks.length, type: b.type, text: b.text.trim() });
+      }
+    }
+    return { blocks, skippedRefs, skippedOther };
+  }
+
   async function renderOutlineListView() {
     const wrap = $("#journalBody");
     if (!wrap) return;
     const outlines = (await getAllOutlines()).sort((a, b) => b.updatedAt - a.updatedAt);
     wrap.innerHTML = `
       <div class="hint">A study outline mixes your own points with the verses backing them, in the order you'll actually use them \u2014 teaching, leading a study, or just thinking a passage through.</div>
-      <button class="dl" id="outlineNewBtn" style="width:100%;margin-bottom:14px">+ New outline</button>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="dl" id="outlineNewBtn" style="flex:1">+ New outline</button>
+        <button class="dl" id="outlineImportBtn" style="flex:1">\u2726 Import from AI</button>
+      </div>
       ${outlines.length ? outlines.map((o) => `
         <div class="trcard outline-row" data-id="${escapeHtml(o.id)}">
           <div class="trcard-name" style="font-size:16px">${escapeHtml(o.title)}</div>
@@ -3600,9 +3781,18 @@
       state.outlineEditingId = rec.id;
       renderOutlineEditor();
     });
+    $("#outlineImportBtn").addEventListener("click", openOutlineImportSheet);
     wrap.querySelectorAll(".outline-row").forEach((row) => {
       row.addEventListener("click", () => { state.outlineEditingId = row.dataset.id; renderOutlineEditor(); });
     });
+  }
+
+  function openOutlineImportSheet() {
+    $("#outlineImportInput").value = "";
+    $("#outlineImportPrompt").value = "";
+    $("#outlineImportPasteWrap").style.display = "none";
+    $("#outlineImportStatus").textContent = "";
+    $("#outlineImportBackdrop").classList.add("show");
   }
 
   function moveBlock(blocks, i, dir) {
@@ -3626,21 +3816,30 @@
           <button data-move="down" data-i="${i}" ${i === outline.blocks.length - 1 ? "disabled" : ""}>\u2193</button>
           <button data-del="${i}">\u00d7</button>
         </div>`;
-      if (b.type === "heading") return `<div class="outline-block outline-heading">${controls}<div class="testament-label" style="margin:0">${escapeHtml(b.text)}</div></div>`;
-      if (b.type === "point") return `<div class="outline-block outline-point">${controls}<div>\u2022 ${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "heading") return `<div class="outline-block outline-heading" data-edit="${i}">${controls}<div class="testament-label" style="margin:0">${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "text") return `<div class="outline-block" data-edit="${i}">${controls}<div style="font-size:14px;line-height:1.55">${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "point") return `<div class="outline-block outline-point" data-edit="${i}">${controls}<div>\u2022 ${escapeHtml(b.text)}</div></div>`;
+      if (b.type === "question") return `<div class="outline-block outline-question" data-edit="${i}">${controls}<div style="font-style:italic;color:var(--ink-soft)">? ${escapeHtml(b.text)}</div></div>`;
       return `<div class="outline-block outline-verse">${controls}<div class="page-title" style="margin:0 0 4px">${escapeHtml(refLabel(b.ref.book, b.ref.chapter, b.ref.verseStart, b.ref.verseEnd))}</div><div style="font-size:14px;color:var(--ink-soft)">${escapeHtml(b.text)}</div></div>`;
     };
 
     wrap.innerHTML = `
       <button id="outlineBackBtn" style="background:none;border:none;color:var(--cover);font-family:var(--font-ui);font-size:13px;font-weight:600;padding:0 0 12px">\u2039 All outlines</button>
       <div class="trcard-name" style="font-size:19px;margin-bottom:14px" id="outlineTitleDisplay">${escapeHtml(outline.title)}</div>
-      ${outline.blocks.length ? outline.blocks.map(blockHtml).join("") : `<div class="hint">Empty so far. Add a heading, a point, or a verse below.</div>`}
-      <div style="display:flex;gap:6px;margin:14px 0">
+      ${outline.blocks.length ? outline.blocks.map(blockHtml).join("") : `<div class="hint">Empty so far. Add a block below, or import one from an AI.</div>`}
+      <div style="display:flex;gap:6px;margin:14px 0 6px">
         <button class="dl" id="outlineAddHeading" style="flex:1;font-size:12.5px">+ Heading</button>
+        <button class="dl" id="outlineAddText" style="flex:1;font-size:12.5px">+ Text</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:14px">
         <button class="dl" id="outlineAddPoint" style="flex:1;font-size:12.5px">+ Point</button>
+        <button class="dl" id="outlineAddQuestion" style="flex:1;font-size:12.5px">+ Question</button>
         <button class="dl" id="outlineAddVerse" style="flex:1;font-size:12.5px">+ Verse</button>
       </div>
-      <button class="dl" id="outlineCopyBtn" style="width:100%;margin-bottom:8px">Copy as text</button>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="dl" id="outlineCopyBtn" style="flex:1">Copy as text</button>
+        <button class="dl" id="outlineCopyJsonBtn" style="flex:1">Copy as JSON</button>
+      </div>
       <button id="outlineDeleteBtn" style="width:100%;font-family:var(--font-ui);font-weight:600;padding:11px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink-soft)">Delete outline</button>
     `;
     $("#outlineTitleDisplay").addEventListener("click", async () => {
@@ -3651,18 +3850,20 @@
       renderOutlineEditor();
     });
     $("#outlineBackBtn").addEventListener("click", () => { state.outlineEditingId = null; renderOutlineListView(); });
-    $("#outlineAddHeading").addEventListener("click", async () => {
-      const t = prompt("Heading text?");
-      if (!t) return;
-      outline.blocks.push({ id: "b_" + Date.now(), type: "heading", text: t });
-      await saveOutline(outline); renderOutlineEditor();
-    });
-    $("#outlineAddPoint").addEventListener("click", async () => {
-      const t = prompt("Point text?");
-      if (!t) return;
-      outline.blocks.push({ id: "b_" + Date.now(), type: "point", text: t });
-      await saveOutline(outline); renderOutlineEditor();
-    });
+
+    const addSimpleBlock = (btnId, type, promptText) => {
+      $(btnId).addEventListener("click", async () => {
+        const t = prompt(promptText);
+        if (!t) return;
+        outline.blocks.push({ id: "b_" + Date.now(), type, text: t });
+        await saveOutline(outline); renderOutlineEditor();
+      });
+    };
+    addSimpleBlock("#outlineAddHeading", "heading", "Heading text?");
+    addSimpleBlock("#outlineAddText", "text", "Text? (a theme statement, explanation, or closing thought)");
+    addSimpleBlock("#outlineAddPoint", "point", "Point text?");
+    addSimpleBlock("#outlineAddQuestion", "question", "Discussion question?");
+
     $("#outlineAddVerse").addEventListener("click", async () => {
       const raw = prompt('Reference? (e.g. "Romans 8:28")');
       if (!raw) return;
@@ -3685,20 +3886,40 @@
       await saveOutline(outline); renderOutlineEditor();
     });
     wrap.querySelectorAll("[data-move]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
         outline.blocks = moveBlock(outline.blocks, parseInt(btn.dataset.i, 10), btn.dataset.move === "up" ? -1 : 1);
         await saveOutline(outline); renderOutlineEditor();
       });
     });
     wrap.querySelectorAll("[data-del]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
         outline.blocks.splice(parseInt(btn.dataset.del, 10), 1);
+        await saveOutline(outline); renderOutlineEditor();
+      });
+    });
+    // Tap-to-edit for text-bearing blocks (heading/text/point/question).
+    // Verse blocks aren't editable this way -- delete and re-add to change
+    // a reference, since editing would mean re-fetching text anyway.
+    wrap.querySelectorAll("[data-edit]").forEach((el) => {
+      el.addEventListener("click", async (ev) => {
+        if (ev.target.closest(".outline-controls")) return;
+        const i = parseInt(el.dataset.edit, 10);
+        const b = outline.blocks[i];
+        const t = prompt("Edit text:", b.text);
+        if (!t || t === b.text) return;
+        b.text = t;
         await saveOutline(outline); renderOutlineEditor();
       });
     });
     $("#outlineCopyBtn").addEventListener("click", () => {
       const text = outlineToText(outline);
       if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast("Copied as text"));
+    });
+    $("#outlineCopyJsonBtn").addEventListener("click", () => {
+      const json = outlineToJson(outline);
+      if (navigator.clipboard) navigator.clipboard.writeText(json).then(() => toast("Copied as JSON"));
     });
     $("#outlineDeleteBtn").addEventListener("click", async () => {
       if (!confirm(`Delete "${outline.title}"? This can't be undone.`)) return;
@@ -4311,7 +4532,8 @@
       <p><strong>Prayer</strong> \u2014 add a request in a line of text. Tap it to add detail, note that you prayed for it, set a category, or mark it answered. Requests you haven't prayed for in a while drift to the top, so nothing quietly falls off the list. Answered prayers get their own section with how long you carried each one, plus room to write down what happened \u2014 it's genuinely easy to forget what's already been answered. <em>Pray now</em> runs a simple timer and logs the minutes. There are no streaks or targets here on purpose: streaks suit a daily habit, but attached to prayer they'd turn it into score-keeping, and a broken streak becomes guilt about praying.</p>
       <p><strong>Plan</strong> \u2014 pick a reading plan (Whole Bible in a year, New Testament in 90 days, the Gospels in a month, and others) and it shows you today's assignment, one tap from the reading itself. This is where streaks belong \u2014 a daily-habit goal is exactly what they're for.</p>
       <p><strong>Memory</strong> \u2014 verses you've chosen to memorize (add one from any verse's menu while reading) come up for review on a spaced schedule: sooner after you add them, further apart each time you get one right. Practice shows the verse with a growing share of words blanked out as you review it more.</p>
-      <p><strong>Outlines</strong> \u2014 build a document mixing your own headings and points with verses, in whatever order you'll actually use it \u2014 teaching, leading a study, or thinking a passage through. Reorder blocks with the arrows, and copy the whole thing as plain text when you're ready to use it elsewhere.</p>
+      <p><strong>Outlines</strong> \u2014 build a document mixing headings, plain text, teaching points, discussion questions, and verses, in whatever order you'll actually use it \u2014 teaching, leading a study, or thinking a passage through. Tap a block to edit it, reorder with the arrows, and copy the whole thing as text or JSON when you're ready to use it elsewhere.</p>
+      <p><strong>\u2726 Import from AI</strong> builds a prompt from a topic you give it, or from an existing outline you already have (paste one in from ChatGPT or anywhere else) \u2014 copy the prompt into any AI, paste its JSON reply back, and it becomes a real outline you can keep editing. The AI supplies structure and its own words; verse text always comes from the app's own Bible data, never from the AI, so nothing scriptural is ever hallucinated.</p>
       <p>All of it stays on your device, and prayers, memory verses, and outlines are included in your backup file.</p>` },
 
     { id: "h-original", title: "Hebrew and Greek", body: `
@@ -5030,6 +5252,43 @@
     if (navigator.clipboard) navigator.clipboard.writeText($("#recapText").value).then(() => toast("Recap copied"));
   });
   $("#recapCloseBtn").addEventListener("click", () => $("#recapBackdrop").classList.remove("show"));
+
+  /* ---- outline JSON import ---- */
+  $("#outlineBuildPromptBtn").addEventListener("click", () => {
+    const input = $("#outlineImportInput").value.trim();
+    if (!input) { toast("Enter a topic or paste an outline first."); return; }
+    $("#outlineImportPrompt").value = buildOutlinePrompt(input);
+    $("#outlineImportPasteWrap").style.display = "block";
+    $("#outlineImportStatus").textContent = "";
+  });
+  $("#outlineCopyPromptBtn").addEventListener("click", () => {
+    const val = $("#outlineImportPrompt").value;
+    if (navigator.clipboard) navigator.clipboard.writeText(val).then(() => toast("Prompt copied \u2014 paste it into your AI of choice"));
+  });
+  $("#outlineDoImportBtn").addEventListener("click", async () => {
+    const raw = $("#outlineImportPaste").value;
+    if (!raw.trim()) { toast("Paste the AI's reply first."); return; }
+    $("#outlineImportStatus").textContent = "Importing\u2026";
+    try {
+      const data = parseOutlineJson(raw);
+      const { blocks, skippedRefs, skippedOther } = await buildBlocksFromJson(data);
+      if (!blocks.length) throw new Error("No usable blocks came through \u2014 check the JSON matches the expected shape.");
+      const rec = { id: "o_" + Date.now(), title: data.title.trim(), blocks, createdAt: Date.now(), updatedAt: Date.now() };
+      await saveOutline(rec);
+      $("#outlineImportBackdrop").classList.remove("show");
+      const skipped = skippedRefs + skippedOther;
+      toast(`Imported "${rec.title}"` + (skipped ? ` \u2014 ${skipped} block${skipped === 1 ? "" : "s"} skipped` : ""));
+      state.outlineEditingId = rec.id;
+      renderOutlineEditor();
+    } catch (e) {
+      $("#outlineImportStatus").textContent = "Couldn't import: " + (e && e.message ? e.message : "unknown error");
+    }
+  });
+  $("#outlineImportClose").addEventListener("click", () => $("#outlineImportBackdrop").classList.remove("show"));
+  $("#outlineImportBackdrop").addEventListener("click", (ev) => {
+    if (ev.target.id === "outlineImportBackdrop") $("#outlineImportBackdrop").classList.remove("show");
+  });
+
   $("#recapBackdrop").addEventListener("click", (ev) => {
     if (ev.target.id === "recapBackdrop") $("#recapBackdrop").classList.remove("show");
   });
@@ -5183,6 +5442,11 @@
   async function boot() {
     try { await openDB(); }
     catch (e) { toast("This browser doesn't support offline storage — reading will still work online."); }
+    // Some browsers (iOS Safari notably) load the voice list asynchronously
+    // and can return an empty list on the very first speak() call. Touching
+    // getVoices() this early nudges that load to happen well before anyone
+    // taps Listen, rather than exactly when it matters.
+    if (speechSupported()) window.speechSynthesis.getVoices();
     seedDefaultTabsIfEmpty();
     renderTabStrip();
     setView("read");

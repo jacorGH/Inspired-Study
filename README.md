@@ -11,11 +11,13 @@ The name is from Acts 17:11 — the Bereans "searched the scriptures daily, whet
 - [What's in it](#whats-in-it)
 - [Setting it up](#setting-it-up)
 - [Using it](#using-it)
-  - [Reading and marking up](#reading-and-marking-up)
+  - [Getting around](#getting-around)
+  - [Reading, marking up, and listening](#reading-marking-up-and-listening)
   - [Compare](#compare)
   - [Tabs](#tabs)
   - [Search](#search)
   - [Study sessions](#study-sessions)
+  - [Journal](#journal)
   - [Hebrew and Greek](#hebrew-and-greek)
   - [Cross-references](#cross-references)
   - [Apologetics practice](#apologetics-practice)
@@ -34,13 +36,18 @@ The name is from Acts 17:11 — the Bereans "searched the scriptures daily, whet
 - **Side-by-side compare** of any two translations, rendered as facing pages
 - **Cross-reference tabs** holding several passages at once, side by side
 - **Highlights and per-verse notes**, attached to the verse rather than the translation
-- **Peer-to-peer study sessions** with host migration and optional shared markup
-- **Strong's Concordance** with tap-a-word Hebrew/Greek lookup
+- **Read-aloud**, verse by verse, with the current verse highlighted as it's spoken
+- **Peer-to-peer study sessions** with host migration, optional shared markup, and a recap when you leave
+- **Strong's Concordance** with tap-a-word Hebrew/Greek lookup, and a true concordance search — every verse using a given original-language word
 - **Treasury of Scripture Knowledge** — the classic cross-reference set
 - **Nave's Topical Bible** — study by subject rather than by passage
 - **AI cross-reference prompts** that work with any AI chat, no API key needed
 - **Apologetics practice** — six common objections with response outlines
-- **Backup and restore** to a file
+- **A prayer journal** — requests, an answered-prayer record, and a simple timer (deliberately no streaks)
+- **Reading plans** with progress tracking and streaks
+- **Verse memorization** with spaced repetition
+- **A study outline builder** — your own points interleaved with verses, exportable as text
+- **Backup and restore** to a file, covering everything above
 - **Installable** to a phone home screen as a full-screen app
 
 ---
@@ -66,16 +73,23 @@ No build step, no dependencies to install, no server. The only external file is 
 
 Nothing needs configuring to read. Tap the reference in the top bar to jump to any book and chapter; the dropdown beside it switches translation.
 
-**Worth doing first:** open **Library → Translations** and download KJV or WEB. That makes the whole Bible available offline and switches on full-text search. Everything else in Library is optional.
+**Worth doing first:** open **☰ Berea → Translations** and download KJV or WEB. That makes the whole Bible available offline and switches on full-text search. Everything else behind the menu is optional.
 
-### Reading and marking up
+### Getting around
+
+The bottom bar holds the five places you'll use daily: **Read, Compare, Search, Study, Journal.** Everything else — downloads, the in-app guide, apologetics, and backup — lives behind **☰ Berea** in the top left, since those are places you visit occasionally rather than every day.
+
+### Reading, marking up, and listening
 
 Tap any verse for its menu:
 
 - **Highlight** in five colours. Highlights are keyed to the verse, so marking John 3:16 marks it in every translation.
 - **Write a note.** Notes save on every exit path — colour tap, Close, or tapping the backdrop — so a typed note can't be lost by dismissing the sheet the "wrong" way. A small ✎ marks any verse that has one.
 - **Pin as a tab**, or add to an existing tab.
+- **Add to memory verses** for spaced-repetition practice (see [Journal](#journal)).
 - **Cross-references**, traditional or AI-assisted.
+
+The 🔊 button at the top of the Read view reads the chapter aloud, one verse at a time, highlighting each as it's spoken — uses the browser's built-in speech synthesis, so voice quality depends on your device.
 
 ### Compare
 
@@ -91,15 +105,18 @@ Inside an open tab, **+ Add a cross-reference passage** accepts plain references
 
 ### Search
 
-Three modes:
+Four modes:
 
 | Mode | Searches |
 |---|---|
 | **Verses** | Full text of downloaded/cached translations. Tap to jump, or pin straight to a tab. |
 | **Tabs** | Your saved tabs, by name or by any reference inside them. |
 | **Topics** | Nave's Topical Bible, once downloaded — by subject rather than wording. |
+| **Words** | A true concordance, once a tagged Bible and its word index are built (see [Hebrew and Greek](#hebrew-and-greek)) — search an English word, transliteration, or Strong's number and get *every* verse using that exact original-language word. This is where Strong's earns its keep: one Hebrew word rendered six different ways teaches more than any single definition. |
 
 Search only covers text stored on your device, so downloading a translation makes it substantially more useful.
+
+Jumping to a verse from any result list leaves a **"‹ Back to…"** chip at the top of the reader, so you're never stranded after following a lead — tapping it reopens the exact list you came from, not just a reset search box.
 
 ### Study sessions
 
@@ -112,12 +129,32 @@ It's a full mesh — everyone connects directly to everyone else — so the sess
 
 Conflicts on shared marks are last-write-wins.
 
+**Leaving a study that covered ground** shows a recap — passages visited and tabs pinned, ready to copy. It's built from your own local record, not synced, so each person's recap reflects what they personally had open.
+
+### Journal
+
+The **Journal** tab is for what you bring rather than what you read. Four parts, switched with the strip at the top:
+
+**Prayer** — add a request in a line of text; tap it to add detail, log that you prayed for it, set a category, or mark it answered. Requests you haven't prayed for in a while drift to the top. Answered prayers get their own section with how long you carried each one and room to record what happened. *Pray now* runs a simple timer and logs the minutes.
+
+There are **no streaks on prayer, on purpose.** Streaks suit a daily-habit goal; applied to something devotional they turn it into score-keeping, and a broken streak becomes guilt about praying. The record here is quiet — the warmth is saved for the moment something's answered.
+
+**Plan** — pick a reading plan (Whole Bible in a year, New Testament in 90 days, the Gospels in a month, Psalms in a month, Old Testament in 180 days) and it shows today's assignment, one tap from the reading itself. Chapters are spread as evenly as the day count allows. This is where streaks *do* belong — the streak survives until a full calendar day is missed, so it won't read as "broken" every morning before you've had a chance to read.
+
+**Memory** — verses added from the Read view's menu come up for review on a spaced schedule (a simplified SM-2): sooner after adding, further apart each time you get one right, faster again if you slip. Practice shows the reference first, then reveals the verse with a growing share of words blanked out as your review count rises.
+
+**Outlines** — build a small document mixing your own headings and points with verses, in whatever order you'll actually use it: teaching, leading a study, or thinking a passage through. Add blocks, reorder with the ↑↓ arrows, and **Copy as text** when you're ready to use it elsewhere. Verse text is captured at the moment you add it, so it won't shift under you later if you switch translations.
+
+All of Journal stays on your device and is included in your backup file.
+
 ### Hebrew and Greek
 
-Two separate downloads under **Library → Hebrew & Greek**:
+Two separate downloads under **☰ Berea → Hebrew & Greek**:
 
 - **Strong's dictionaries** (Hebrew and Greek) — then search by English word, transliteration, or number: `agape`, `H7225`, `G26`.
 - **Tap-a-word text** — a Strong's-tagged KJV or ASV. Once downloaded, the **Strong's** button appears at the top of the Read view. Tagged words get a dotted underline; tap one for lexeme, transliteration, pronunciation, and definition. Words carrying several roots show each entry.
+
+After downloading tagged text, **build the word index** (same screen) to turn on Search › Words — a real concordance, letting you find every verse that uses a given original-language word rather than just looking one up.
 
 Lookups run offline once the dictionaries are downloaded, and fall back to an online lexicon otherwise. The sheet tells you which source it used.
 
@@ -137,12 +174,12 @@ Six common objections — suffering, alleged contradictions, Gospel reliability,
 
 ### Backup and restore
 
-Tabs, highlights, and notes live **only in the browser**. Clearing site data or switching devices loses them, so save a backup file occasionally.
+Tabs, highlights, notes, prayers, reading-plan progress, memory verses, and outlines all live **only in the browser**. Clearing site data or switching devices loses them, so save a backup file occasionally.
 
 - **Save backup** downloads a dated JSON file.
-- **Restore** *merges* rather than replaces — it won't wipe work already on the device. Where both have something for the same verse or tab, the restored file wins.
+- **Restore** *merges* rather than replaces — it won't wipe work already on the device. Where both have something for the same verse or tab, the restored file generally wins — with one deliberate exception: reading-plan progress is merged day-by-day, and where both copies have a completion for the same day, the **device you're restoring onto wins**, so an older backup can never erase progress made since.
 
-Backups deliberately exclude downloaded scripture, dictionaries, cross-references, and your AI key. The first three are large and re-downloadable; the key stays out because backup files get emailed and synced around.
+Backups deliberately exclude downloaded scripture, dictionaries, cross-references, the topic index, and your AI key. Those are large and re-downloadable; the key stays out because backup files get emailed and synced around.
 
 ---
 
@@ -178,16 +215,21 @@ Adding them means a licensed API (such as API.Bible) with a user-supplied key, f
 
 Single HTML file. No build step, no framework, no bundler — so it can be dropped straight onto GitHub Pages and edited with any text editor.
 
-- **Storage** — IndexedDB for scripture, dictionaries, cross-references, topics, highlights and notes; `localStorage` for tabs and preferences.
+- **Storage** — IndexedDB for scripture, dictionaries, cross-references, topics, the concordance index, highlights, notes, prayers, reading-plan progress, memory verses, and outlines; `localStorage` for tabs and preferences. The schema has gone through several versions as features were added; IndexedDB migrates automatically on open, so nothing needs doing by hand.
 - **Scripture is not bundled.** Downloads fetch from public repositories and cache locally, which keeps the file editable and the texts updatable.
 - **Networking** — PeerJS for WebRTC study sessions. A public signalling service helps browsers find each other; once connected, all session traffic is peer-to-peer.
+- **Speech** — the browser's built-in SpeechSynthesis API for read-aloud. No external service, no download.
 - **Privacy** — no account, no analytics, no server storing your work.
 
 Some notes for anyone modifying it:
 
-- Verse keys are `Book|Chapter|Verse` throughout — highlights, notes, cross-references and tagged text all share that format.
+- Verse keys are `Book|Chapter|Verse` throughout — highlights, notes, cross-references, tagged text, and memory verses all share that format.
 - Data-source parsers are deliberately defensive. The Strong's tag parser auto-detects between markup conventions; the Nave's CSV loader detects column names and fails with a readable error naming the actual headers rather than importing nothing silently.
-- Bulk-import code is batched into chunked IndexedDB transactions to avoid blocking on large datasets.
+- Bulk-import code is batched into chunked IndexedDB transactions to avoid blocking on large datasets. When a write transaction needs a read first (as the reading-plan merge does), the read happens in its own transaction *before* the write loop starts — interleaving an awaited read inside an open write transaction risks the transaction auto-committing early in some browsers, Safari especially.
+- The concordance is a proper inverted index (Strong's number → every verse using it), built once with a database cursor rather than loading all tagged text into memory, and searched instantly afterward rather than rescanned per query.
+- Memorization uses a simplified SM-2 spaced-repetition schedule with an ease-factor floor, so repeated misses can't spiral a card into an unrecoverable state.
+- Reading-plan streaks compare **local calendar days**, not raw elapsed hours — a streak survives until a full day is missed, so it doesn't read as broken every morning before you've had a chance to read.
+- The backup format has its own version number (currently 3) independent of the database schema version, and grows monotonically as new data types are added — never remove a field from an old format without keeping restore able to read it.
 - The in-app how-to (the `HELP` array) mirrors this README. Change behaviour, update both.
 
 ---
@@ -200,12 +242,18 @@ Some notes for anyone modifying it:
 
 **Tagged text downloaded but tapping words does nothing.** The Library card reports what it found. If it says *"no Strong's tags were found"*, the source text isn't tagged in a format the parser recognises — try the other translation, or check the source URL in `BOLLS_TAGGED`.
 
+**Search › Words is empty even after downloading tagged text.** Two separate steps: downloading the tagged Bible and *building the word index* are different actions, both under **☰ Berea → Hebrew & Greek**. The index has to be built (or rebuilt) once after a tagged download before Words search finds anything.
+
 **Nave's download fails with a column error.** The message names the actual CSV headers it found. Add the relevant one to `TOPIC_COLUMNS` or `ENTRY_COLUMNS` at the top of that module. Note that Nave's has no reference column — citations are scanned out of the `entry` prose by `extractReferences`, so a topic whose entry contains no recognisable citation is skipped by design.
 
 **Cross-references download fails.** `downloadCrossReferences` tries several known mirrors of `cross_references.txt` in turn and reports failure only if all are unreachable. If that happens, add a working URL to `XREF_URLS`.
 
-**Search returns nothing.** Search only covers text stored on your device. Download a translation under Library, or read a few chapters first.
+**Search returns nothing.** Search only covers text stored on your device. Download a translation under ☰ Berea, or read a few chapters first.
+
+**🔊 read-aloud does nothing, or the toast says it's unsupported.** Depends entirely on the browser's SpeechSynthesis support — nearly universal on iOS/Android/desktop Safari, Chrome, and Edge, but can be missing in embedded webviews (an in-app browser inside another app, for instance). Try opening the page in the regular browser app.
+
+**A reading-plan streak looks wrong.** It's calculated from local calendar days, not a rolling 24-hour count, and today doesn't have to be done yet for the streak to still be "alive" — only a full missed day breaks it. If the streak seems off by exactly one, check the device's clock and timezone setting.
 
 **Study session won't connect.** Both devices need internet access for the initial handshake. Corporate or school networks sometimes block WebRTC. If a session drops after backgrounding the app, reopening the link rejoins.
 
-**Lost tabs, highlights, or notes.** Browser storage was probably cleared. Restore from a backup file if you have one. If not, save backups going forward — this is the one loss that can't be undone.
+**Lost tabs, highlights, notes, prayers, plans, memory verses, or outlines.** Browser storage was probably cleared. Restore from a backup file if you have one. If not, save backups going forward — this is the one loss that can't be undone.
