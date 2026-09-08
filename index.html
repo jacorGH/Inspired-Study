@@ -671,6 +671,7 @@
   .roster-tag {
     font-family: var(--font-ui); font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px; color: var(--gilt);
   }
+  #myRosterRow:active { background: var(--gilt-soft); }
   .code-input {
     flex: 1; font-family: var(--font-ui); font-size: 15px; padding: 10px 12px;
     border: 1px solid var(--line); border-radius: 9px; text-transform: uppercase;
@@ -4683,7 +4684,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       <p>Search only covers text stored on your device, so downloading a translation makes it far more useful.</p>` },
 
     { id: "h-study", title: "Study sessions — reading together", body: `
-      <p>The <strong>Study</strong> tab starts a shared session. Tap <em>Start a Study</em>, then send the link over any messaging app — whoever opens it joins straight away, no code to type. First-time guests are asked for a name right there in the app before joining; the room's roster (everyone connected) shows at the top of the Study tab once you're in.</p>
+      <p>The <strong>Study</strong> tab starts a shared session. Tap <em>Start a Study</em>, then send the link over any messaging app — whoever opens it joins straight away, no code to type. First-time guests are asked for a name right there in the app before joining; the room's roster (everyone connected) shows at the top of the Study tab once you're in. Tap your own name in that list any time \u2014 in or out of a session \u2014 to change it.</p>
       <p><strong>Leading:</strong> whoever leads moves the group through the passage. Anyone can tap <em>Take the lead</em>, and anyone can switch off <em>Follow along</em> to wander on their own.</p>
       <p><strong>Sharing marks</strong> is off by default. Switch it on and your highlights and notes go to everyone else who also has it on, and theirs come to you. Leave it off to mark up privately. If you turn it on mid-study, <em>Send my existing marks</em> catches the group up on the current chapter.</p>
       <p><strong>Sharing an outline</strong> — open it under Journal › Outlines while in a session and tap <em>Share with study group</em>; it appears in everyone's own Outlines list. Sharing again after further edits updates their copy.</p>
@@ -4909,6 +4910,29 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       localStorage.setItem("berea.name", name);
     }
     return name;
+  }
+
+  // The only way a name ever got set was write-once (getMyName above, or
+  // the inline join form) -- there was no path back to change it afterward.
+  // This is that path. Safe to use a plain prompt() here specifically
+  // because it's always triggered by a direct tap on a real button, never
+  // from a timer -- the opposite of the auto-join case that had to avoid
+  // prompt() entirely.
+  function changeMyName() {
+    const current = localStorage.getItem("berea.name") || "";
+    const next = prompt("What name should the study group see?", current);
+    if (next === null) return; // cancelled
+    const trimmed = next.trim();
+    if (!trimmed) { toast("Name can't be empty."); return; }
+    localStorage.setItem("berea.name", trimmed);
+    mesh.myName = trimmed;
+    if (mesh.active) {
+      // Let everyone already connected know, so their roster updates
+      // without needing anyone to reconnect.
+      meshBroadcast({ t: "presence", id: mesh.myId, name: trimmed });
+    }
+    toast(mesh.active ? "Name updated \u2014 the group will see it too" : "Name updated");
+    renderStudyView();
   }
 
   function meshBroadcast(msg, exceptId) {
@@ -5258,22 +5282,25 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         wrap.innerHTML = `<div class="hint">${escapeHtml(mesh.joinStatus)}</div>`;
         return;
       }
+      const knownName = localStorage.getItem("berea.name");
       wrap.innerHTML = `
         <div class="hint">Start a study to read together in real time. Everyone stays in sync as the leader moves through a passage, and the group keeps going even if whoever started it drops off.</div>
         <button class="dl" id="startStudyBtn" style="width:100%;margin-bottom:18px">Start a Study</button>
         <div class="testament-label">Have a code?</div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;margin-bottom:18px">
           <input id="joinCodeInput" class="code-input" type="text" placeholder="6-letter code" maxlength="6">
           <button class="dl" id="joinStudyBtn">Join</button>
-        </div>`;
+        </div>
+        ${knownName ? `<div style="font-family:var(--font-ui);font-size:12.5px;color:var(--ink-faint);text-align:center">Your name: <strong style="color:var(--ink-soft)">${escapeHtml(knownName)}</strong> \u00b7 <button id="changeNameBtn" style="background:none;border:none;color:var(--cover);font-weight:600;padding:0">Change</button></div>` : ""}`;
       $("#startStudyBtn").addEventListener("click", startStudy);
       $("#joinStudyBtn").addEventListener("click", () => joinStudy($("#joinCodeInput").value));
       $("#joinCodeInput").addEventListener("keydown", (ev) => { if (ev.key === "Enter") joinStudy(ev.target.value); });
+      $("#changeNameBtn")?.addEventListener("click", changeMyName);
       return;
     }
     const shareUrl = location.origin + location.pathname + "#study=" + mesh.roomCode;
-    const rosterList = [{ id: mesh.myId, name: mesh.myName + " (you)" }]
-      .concat(Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name })));
+    const rosterList = [{ id: mesh.myId, name: mesh.myName, mine: true }]
+      .concat(Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name, mine: false })));
     wrap.innerHTML = `
       <div class="hint"><strong>Room code: ${mesh.roomCode}</strong><br>Share this link in your messaging app — anyone who opens it joins instantly.</div>
       <div style="display:flex;gap:8px;margin-bottom:18px">
@@ -5281,8 +5308,8 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         ${navigator.share ? '<button class="dl" id="shareLinkBtn" style="flex:1">Share…</button>' : ""}
       </div>
       <div class="testament-label">In this study (${rosterList.length})</div>
-      <div style="margin-bottom:16px">${rosterList.map((p) => `<div class="roster-row">
-        <span>${escapeHtml(p.name)}</span>${mesh.leaderId === p.id ? '<span class="roster-tag">LEADING</span>' : ""}
+      <div style="margin-bottom:16px">${rosterList.map((p) => `<div class="roster-row"${p.mine ? ' id="myRosterRow" style="cursor:pointer"' : ""}>
+        <span>${escapeHtml(p.name)}${p.mine ? " (you \u2014 tap to rename)" : ""}</span>${mesh.leaderId === p.id ? '<span class="roster-tag">LEADING</span>' : ""}
       </div>`).join("")}</div>
       ${mesh.isLeader
         ? `<div class="hint">You're leading — your navigation moves everyone who's following along.</div>`
@@ -5293,6 +5320,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       ${mesh.shareMarkup ? `<button class="dl" id="pushMarkupBtn" style="width:100%;margin-bottom:16px">Send my existing marks for ${escapeHtml(state.book.name)} ${state.chapter}</button>` : ""}
       <button class="leave-btn" id="leaveStudyBtn">Leave study</button>
     `;
+    $("#myRosterRow").addEventListener("click", changeMyName);
     $("#copyLinkBtn").addEventListener("click", () => {
       if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied"));
     });

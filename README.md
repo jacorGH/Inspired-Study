@@ -122,7 +122,7 @@ Jumping to a verse from any result list leaves a **"‹ Back to…"** chip at th
 
 ### Study sessions
 
-Tap **Start a Study**, then share the link through any messaging app. Whoever opens it joins immediately — first-time guests are asked for a name right in the app, not via a browser dialog (see the note below on why that distinction matters). The roster of everyone connected shows at the top of the Study tab.
+Tap **Start a Study**, then share the link through any messaging app. Whoever opens it joins immediately — first-time guests are asked for a name right in the app, not via a browser dialog (see the note below on why that distinction matters). The roster of everyone connected shows at the top of the Study tab; tap your own name there any time — in or out of a session — to change it.
 
 - **Leading** — the leader's navigation moves everyone following along. Anyone can *Take the lead*; anyone can switch off *Follow along* to read independently.
 - **Sharing highlights and notes** — off by default. Switch it on and your marks go to everyone else who also has it on, and theirs are saved to your copy. Leave it off to read along and mark up privately. Turning it on mid-study? *Send my existing marks* catches the group up on the current chapter.
