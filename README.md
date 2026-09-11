@@ -22,8 +22,9 @@ The name is from Acts 17:11 — the Bereans "searched the scriptures daily, whet
   - [Cross-references](#cross-references)
   - [Apologetics practice](#apologetics-practice)
   - [Backup and restore](#backup-and-restore)
+  - [Language](#language)
 - [Data sources and licences](#data-sources-and-licences)
-- [Why no NIV or NKJV](#why-no-niv-or-nkjv)
+- [Why no NIV, NKJV, or Reina-Valera 1960](#why-no-niv-nkjv-or-reina-valera-1960)
 - [How it's built](#how-its-built)
 - [Troubleshooting](#troubleshooting)
 
@@ -31,13 +32,15 @@ The name is from Acts 17:11 — the Bereans "searched the scriptures daily, whet
 
 ## What's in it
 
-- **Six public-domain translations** — KJV, WEB, ASV, BBE, Darby, YLT (New Testament only)
+- **Seven public-domain translations** — KJV, WEB, ASV, BBE, Darby, YLT (New Testament only), Reina-Valera 1909 (Spanish)
 - **Full offline reading and search** once a translation is downloaded
 - **Side-by-side compare** of any two translations, rendered as facing pages
-- **Cross-reference tabs** holding several passages at once, side by side
+- **Cross-reference tabs** holding several passages at once, side by side (2 as facing pages; 3+ as a scrollable list, since a "spread" metaphor stops working past two)
 - **Highlights and per-verse notes**, attached to the verse rather than the translation
-- **Read-aloud**, verse by verse, with the current verse highlighted as it's spoken
-- **Peer-to-peer study sessions** with host migration, optional shared markup, and a recap when you leave
+- **Read-aloud**, verse by verse, with the current verse highlighted as it's spoken; the chapter header stays pinned while you scroll so it's always reachable
+- **Swipe left/right** to move between chapters while reading, crossing book boundaries at either end
+- **A Spanish interface** — the app itself, not just the Bible text; see [Language](#language) below for exactly what's covered
+- **Peer-to-peer study sessions** with host migration, optional shared markup, a recap when you leave, and live outline presenting
 - **Strong's Concordance** with tap-a-word Hebrew/Greek lookup, and a true concordance search — every verse using a given original-language word
 - **Treasury of Scripture Knowledge** — the classic cross-reference set
 - **Nave's Topical Bible** — study by subject rather than by passage
@@ -46,7 +49,7 @@ The name is from Acts 17:11 — the Bereans "searched the scriptures daily, whet
 - **A prayer journal** — requests, an answered-prayer record, and a simple timer (deliberately no streaks)
 - **Reading plans** with progress tracking and streaks
 - **Verse memorization** with spaced repetition
-- **A study outline builder** — your own points interleaved with verses, exportable as text
+- **A study outline builder** with AI import/export, live block-by-block presenting during a study session, and answers/notes on discussion questions
 - **Backup and restore** to a file, covering everything above
 - **Installable** to a phone home screen as a full-screen app
 
@@ -90,6 +93,10 @@ Tap any verse for its menu:
 - **Cross-references**, traditional or AI-assisted.
 
 The 🔊 button at the top of the Read view reads the chapter aloud, one verse at a time, highlighting each as it's spoken — uses the browser's built-in speech synthesis, so voice quality depends on your device.
+
+The chapter header — title, 🔊, and Strong's toggle — stays pinned to the top as you scroll, so both are always one tap away even partway through a long chapter like Psalm 119.
+
+**Swipe left or right** anywhere in the verse text to move to the next or previous chapter, crossing book boundaries at either end (swipe past John 21 and you're in Acts 1). Scoped to the Read view specifically — Compare and Tabs already use horizontal swipe for their own purpose, paging between facing translations.
 
 ### Compare
 
@@ -191,6 +198,16 @@ Tabs, highlights, notes, prayers, reading-plan progress, memory verses, and outl
 
 Backups deliberately exclude downloaded scripture, dictionaries, cross-references, the topic index, and your AI key. Those are large and re-downloadable; the key stays out because backup files get emailed and synced around.
 
+### Language
+
+**☰ Berea → Language / Idioma**, at the very top, switches the app between English and Spanish — the interface itself, not just the Bible text. Book names switch too (Génesis, not Genesis), including everywhere a reference is shown: tabs, search results, outlines, sheets, all of it, since they all route through one shared labeling function.
+
+**What's covered:** navigation, buttons, forms, hints, toasts, the verse action sheet, study sessions — the whole interactive app, the parts you touch on every visit.
+
+**What isn't, yet:** the in-app how-to guide (11 topics) and the apologetics essays (6 of them) stay in English. That's several thousand words of running prose, and translating it well is a genuinely different task from translating an interface — doing both hastily in the same pass risked doing neither well. It's the natural next piece of this, not an oversight.
+
+The switch is instant and reversible, and it's independent of which Bible translation you're reading — read Reina-Valera with an English interface, or KJV with a Spanish one, whatever's useful.
+
 ---
 
 ## Data sources and licences
@@ -201,6 +218,7 @@ All scripture text is public domain. Reference works likewise, with one dataset 
 |---|---|---|
 | KJV, WEB (bulk) | [aruljohn/Bible-kjv](https://github.com/aruljohn/Bible-kjv), [Bible-wmb](https://github.com/aruljohn/Bible-wmb) | Public domain |
 | ASV, BBE, Darby, YLT (live) | [bible-api.com](https://bible-api.com/) | Public domain |
+| Reina-Valera 1909 (bulk) | [aruljohn/Reina-Valera](https://github.com/aruljohn/Reina-Valera) | Public domain |
 | Strong's tagged KJV / ASV | [bolls.life](https://bolls.life/) whole-translation JSON | Public domain texts |
 | Strong's dictionaries | [openscriptures/strongs](https://github.com/openscriptures/strongs) | Public domain |
 | Hebrew/Greek lexicon | Brown-Driver-Briggs / Thayer's via [bolls.life](https://bolls.life/) | Public domain |
@@ -213,11 +231,11 @@ Bolls hosts many modern translations with no stated licence. Berea uses only KJV
 
 ---
 
-## Why no NIV or NKJV
+## Why no NIV, NKJV, or Reina-Valera 1960
 
-Both are under active copyright — NIV to Biblica, NKJV to Thomas Nelson. There's no legal way to bulk-download and redistribute their text inside a static file.
+All three are under active copyright — NIV to Biblica, NKJV to Thomas Nelson, and Reina-Valera **1960** specifically (not every Reina-Valera revision) to Sociedades Bíblicas Unidas / the American Bible Society. That last one surprises people: "Reina-Valera" colloquially means the 1960 revision to most Spanish speakers, the same way "the NIV" is just assumed English — but 1960 is exactly as copyrighted as NIV is, for the exact same reason (a 20th-century publisher revision, not the centuries-old original). Reina-Valera **1909** is the standard public-domain substitute for this reason, confirmed across multiple independent sources (openbible.info, the `open-bibles` and `scrollmapper` repositories, and the Reina-Valera source repo itself) — it's what serious Bible software uses when it needs a legally clean Spanish text, the same role KJV plays in English.
 
-Adding them means a licensed API (such as API.Bible) with a user-supplied key, fetched live rather than cached. The translation registry in the source is structured to make that a contained change if you pursue it.
+There's no legal way to bulk-download and redistribute any of these three inside a static file. Adding them means a licensed API (such as API.Bible) with a user-supplied key, fetched live rather than cached. The translation registry in the source is structured to make that a contained change if you pursue it.
 
 ---
 
@@ -239,6 +257,8 @@ Some notes for anyone modifying it:
 - Anything that calls `speechSynthesis.speak()` has to do so synchronously within the click handler that triggered it, or Safari/iOS silently drops the request with no error. Read-aloud keeps a small cache of the currently-displayed chapter for exactly this reason, rather than fetching fresh on tap.
 - The same class of bug applies to `prompt()`, `alert()`, and `confirm()`: browsers routinely block these when they're not triggered by a direct, synchronous user gesture, especially right after page load. This bit the auto-join flow specifically (a `setTimeout` calling `prompt()` for a guest's name) with a completely silent failure — no error, nothing on screen, the join just never happened. The fix pattern is the same as for speech: never call a browser dialog from a timer or another async callback; use a real in-app form instead, so it's always a genuine tap.
 - AI JSON parsing (outline import, cross-reference import) shares one repair pipeline, `parseAiJsonLoose`, rather than each duplicating the same fixes. The hard part isn't converting curly quotes to straight ones — it's that an AI often reuses the *same* curly-quote character for the JSON delimiters AND a nested quotation inside its own prose, so a blind find-and-replace can't tell a real delimiter from quoted content; converting both identically just moves the corruption rather than fixing it. `smartRequote` resolves this structurally instead: whether a quote closes a string is decided by what comes right after it (skipping whitespace) — a JSON-structural character (`: , } ]`) means it's a true closer, anything else means it's nested content and gets escaped rather than treated as the end of the string. Trailing-comma and unquoted-key repairs stack on top of that, so a reply with more than one problem still repairs in a single pass. All of it only ever runs as a fallback after a first parse attempt on the untouched text fails, never up front: every one of these patterns can also appear as legitimate *content* inside JSON that was never broken, so repairing pre-emptively would occasionally turn valid JSON into broken JSON instead of the other way round.
+- **Language** is a `t(key)` lookup against a `STRINGS.en` / `STRINGS.es` dictionary, with English as the fallback for any missing key so a gap degrades to readable text rather than blank space or a crash. Static markup is tagged `data-i18n` / `data-i18n-placeholder` and refreshed by `applyStaticLanguage()`; dynamic views already rebuild their HTML from `t()` calls on every render, so switching language just re-runs whichever render produced the current screen. Book names follow the same pattern through one shared function, `bookDisplayName()` — the canonical English name stays the storage key everywhere (refs, tabs, outlines, backups), only the *display* changes, so nothing in the data layer needed touching. One hazard worth knowing if you extend this: the codebase used `t` as a local variable name for "tab" in several places before this existed (`const t = loadTabs()`), which silently shadows the global translator inside that scope. Worth an explicit check — `t(...)` called where a local `t` is also in scope — before trusting a new string added inside an existing function.
+- The sticky Read-view header (`.read-head`) uses negative margins matching `#content`'s own padding to span edge-to-edge before `position: sticky` takes over, rather than fighting the padding with `top` offsets — the standard trick for a full-bleed sticky element inside a padded scroll container.
 - The concordance is a proper inverted index (Strong's number → every verse using it), built once with a database cursor rather than loading all tagged text into memory, and searched instantly afterward rather than rescanned per query.
 - Memorization uses a simplified SM-2 spaced-repetition schedule with an ease-factor floor, so repeated misses can't spiral a card into an unrecoverable state.
 - Reading-plan streaks compare **local calendar days**, not raw elapsed hours — a streak survives until a full day is missed, so it doesn't read as broken every morning before you've had a chance to read.

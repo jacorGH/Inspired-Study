@@ -265,7 +265,10 @@
   }
   .back-chip:active { background: var(--gilt-soft); }
   .read-head {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    position: sticky; top: 0; z-index: 5;
+    background: var(--page); margin: -16px -18px 12px; padding: 12px 18px 10px;
+    border-bottom: 1px solid var(--line);
   }
   .read-head h1 { margin: 0; }
   .strongs-toggle {
@@ -737,30 +740,30 @@
     </section>
 
     <section id="view-compare" class="view">
-      <div class="hint">Pick two translations to read the same passage side by side, like an open book. Tap any verse to highlight it or pin it.</div>
+      <div class="hint" data-i18n="compare_hint">Pick two translations to read the same passage side by side, like an open book. Tap any verse to highlight it or pin it.</div>
       <div id="compareSpread" class="spread"></div>
     </section>
 
     <section id="view-search" class="view">
       <div class="seg-toggle" id="searchModeToggle">
-        <button data-mode="verses" class="active" type="button">Verses</button>
-        <button data-mode="tabs" type="button">Tabs</button>
-        <button data-mode="topics" type="button">Topics</button>
-        <button data-mode="words" type="button">Words</button>
+        <button data-mode="verses" class="active" type="button" data-i18n="search_mode_verses">Verses</button>
+        <button data-mode="tabs" type="button" data-i18n="search_mode_tabs">Tabs</button>
+        <button data-mode="topics" type="button" data-i18n="search_mode_topics">Topics</button>
+        <button data-mode="words" type="button" data-i18n="search_mode_words">Words</button>
       </div>
       <form id="searchForm">
         <select id="searchTr"></select>
-        <input id="searchInput" type="text" placeholder="Search the text…" autocomplete="off">
-        <button id="searchGo" type="submit">Go</button>
+        <input id="searchInput" type="text" placeholder="Search the text…" data-i18n-placeholder="search_verses_placeholder" autocomplete="off">
+        <button id="searchGo" type="submit" data-i18n="go">Go</button>
       </form>
       <form id="tabSearchForm" style="display:none">
-        <input id="tabSearchInput" type="text" placeholder="Search your tabs by name or reference…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+        <input id="tabSearchInput" type="text" placeholder="Search your tabs by name or reference…" data-i18n-placeholder="search_tabs_placeholder" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
       </form>
       <form id="wordSearchForm" style="display:none">
-        <input id="wordSearchInput" type="text" placeholder="An English word or Strong's number — mercy, agape, H2617…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+        <input id="wordSearchInput" type="text" placeholder="An English word or Strong's number — mercy, agape, H2617…" data-i18n-placeholder="search_words_placeholder" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
       </form>
       <form id="topicSearchForm" style="display:none">
-        <input id="topicSearchInput" type="text" placeholder="Search topics — faith, forgiveness, prayer…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
+        <input id="topicSearchInput" type="text" placeholder="Search topics — faith, forgiveness, prayer…" data-i18n-placeholder="search_topics_placeholder" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)">
       </form>
       <div id="searchResults"></div>
     </section>
@@ -772,11 +775,18 @@
     </section>
 
     <section id="view-library" class="view">
-      <div class="testament-label" style="margin-top:0">How to use Berea</div>
+      <div class="testament-label" style="margin-top:0">Language / Idioma</div>
+      <div class="seg-toggle" id="langToggle">
+        <button data-lang="en" type="button">English</button>
+        <button data-lang="es" type="button">Espa\u00f1ol</button>
+      </div>
+      <div class="hint">Translates the app itself \u2014 navigation, buttons, hints. Doesn't yet cover this guide or the apologetics essays, which stay in English for now.</div>
+
+      <div class="testament-label" style="margin-top:22px">How to use Berea</div>
       <div id="helpList"></div>
 
       <div class="testament-label" style="margin-top:22px">Translations</div>
-      <div class="hint"><strong>Public-domain translations</strong> download once for full offline reading and search. Licensed translations (NIV, NKJV) aren't included — see the note in the page source for why. YLT covers the New Testament only.</div>
+      <div class="hint"><strong>Public-domain translations</strong> download once for full offline reading and search. Licensed translations (NIV, NKJV, Reina-Valera 1960) aren't included — see the note in the page source for why. YLT covers the New Testament only.</div>
       <div id="trcards"></div>
 
       <div class="testament-label" style="margin-top:22px">Cross-references (AI-assisted)</div>
@@ -815,10 +825,10 @@
 
     <section id="view-journal" class="view">
       <div class="seg-toggle" id="journalModeToggle">
-        <button data-jmode="prayer" class="active" type="button">Prayer</button>
-        <button data-jmode="plan" type="button">Plan</button>
-        <button data-jmode="memory" type="button">Memory</button>
-        <button data-jmode="outline" type="button">Outlines</button>
+        <button data-jmode="prayer" class="active" type="button" data-i18n="journal_mode_prayer">Prayer</button>
+        <button data-jmode="plan" type="button" data-i18n="journal_mode_plan">Plan</button>
+        <button data-jmode="memory" type="button" data-i18n="journal_mode_memory">Memory</button>
+        <button data-jmode="outline" type="button" data-i18n="journal_mode_outline">Outlines</button>
       </div>
       <div id="journalBody"></div>
     </section>
@@ -832,11 +842,11 @@
   <div id="tabstrip"></div>
 
   <div id="bottomnav">
-    <button data-view="read" class="active" type="button"><span class="ic">📖</span>Read</button>
-    <button data-view="compare" type="button"><span class="ic">⇄</span>Compare</button>
-    <button data-view="search" type="button"><span class="ic">🔍</span>Search</button>
-    <button data-view="study" type="button"><span class="ic">👥</span>Study</button>
-    <button data-view="journal" type="button"><span class="ic">🕯️</span>Journal</button>
+    <button data-view="read" class="active" type="button"><span class="ic">📖</span><span data-i18n="nav_read">Read</span></button>
+    <button data-view="compare" type="button"><span class="ic">⇄</span><span data-i18n="nav_compare">Compare</span></button>
+    <button data-view="search" type="button"><span class="ic">🔍</span><span data-i18n="nav_search">Search</span></button>
+    <button data-view="study" type="button"><span class="ic">👥</span><span data-i18n="nav_study">Study</span></button>
+    <button data-view="journal" type="button"><span class="ic">🕯️</span><span data-i18n="nav_journal">Journal</span></button>
   </div>
 
 </div>
@@ -1060,74 +1070,82 @@
      Canonical book data
   ===================================================================== */
   const BOOKS = [
-    { name: "Genesis", usfm: "GEN", file: "Genesis", chapters: 50, testament: "OT" },
-    { name: "Exodus", usfm: "EXO", file: "Exodus", chapters: 40, testament: "OT" },
-    { name: "Leviticus", usfm: "LEV", file: "Leviticus", chapters: 27, testament: "OT" },
-    { name: "Numbers", usfm: "NUM", file: "Numbers", chapters: 36, testament: "OT" },
-    { name: "Deuteronomy", usfm: "DEU", file: "Deuteronomy", chapters: 34, testament: "OT" },
-    { name: "Joshua", usfm: "JOS", file: "Joshua", chapters: 24, testament: "OT" },
-    { name: "Judges", usfm: "JDG", file: "Judges", chapters: 21, testament: "OT" },
-    { name: "Ruth", usfm: "RUT", file: "Ruth", chapters: 4, testament: "OT" },
-    { name: "1 Samuel", usfm: "1SA", file: "1Samuel", chapters: 31, testament: "OT" },
-    { name: "2 Samuel", usfm: "2SA", file: "2Samuel", chapters: 24, testament: "OT" },
-    { name: "1 Kings", usfm: "1KI", file: "1Kings", chapters: 22, testament: "OT" },
-    { name: "2 Kings", usfm: "2KI", file: "2Kings", chapters: 25, testament: "OT" },
-    { name: "1 Chronicles", usfm: "1CH", file: "1Chronicles", chapters: 29, testament: "OT" },
-    { name: "2 Chronicles", usfm: "2CH", file: "2Chronicles", chapters: 36, testament: "OT" },
-    { name: "Ezra", usfm: "EZR", file: "Ezra", chapters: 10, testament: "OT" },
-    { name: "Nehemiah", usfm: "NEH", file: "Nehemiah", chapters: 13, testament: "OT" },
-    { name: "Esther", usfm: "EST", file: "Esther", chapters: 10, testament: "OT" },
-    { name: "Job", usfm: "JOB", file: "Job", chapters: 42, testament: "OT" },
-    { name: "Psalms", usfm: "PSA", file: "Psalms", chapters: 150, testament: "OT" },
-    { name: "Proverbs", usfm: "PRO", file: "Proverbs", chapters: 31, testament: "OT" },
-    { name: "Ecclesiastes", usfm: "ECC", file: "Ecclesiastes", chapters: 12, testament: "OT" },
-    { name: "Song of Solomon", usfm: "SNG", file: "SongofSolomon", chapters: 8, testament: "OT" },
-    { name: "Isaiah", usfm: "ISA", file: "Isaiah", chapters: 66, testament: "OT" },
-    { name: "Jeremiah", usfm: "JER", file: "Jeremiah", chapters: 52, testament: "OT" },
-    { name: "Lamentations", usfm: "LAM", file: "Lamentations", chapters: 5, testament: "OT" },
-    { name: "Ezekiel", usfm: "EZK", file: "Ezekiel", chapters: 48, testament: "OT" },
-    { name: "Daniel", usfm: "DAN", file: "Daniel", chapters: 12, testament: "OT" },
-    { name: "Hosea", usfm: "HOS", file: "Hosea", chapters: 14, testament: "OT" },
-    { name: "Joel", usfm: "JOL", file: "Joel", chapters: 3, testament: "OT" },
-    { name: "Amos", usfm: "AMO", file: "Amos", chapters: 9, testament: "OT" },
-    { name: "Obadiah", usfm: "OBA", file: "Obadiah", chapters: 1, testament: "OT" },
-    { name: "Jonah", usfm: "JON", file: "Jonah", chapters: 4, testament: "OT" },
-    { name: "Micah", usfm: "MIC", file: "Micah", chapters: 7, testament: "OT" },
-    { name: "Nahum", usfm: "NAM", file: "Nahum", chapters: 3, testament: "OT" },
-    { name: "Habakkuk", usfm: "HAB", file: "Habakkuk", chapters: 3, testament: "OT" },
-    { name: "Zephaniah", usfm: "ZEP", file: "Zephaniah", chapters: 3, testament: "OT" },
-    { name: "Haggai", usfm: "HAG", file: "Haggai", chapters: 2, testament: "OT" },
-    { name: "Zechariah", usfm: "ZEC", file: "Zechariah", chapters: 14, testament: "OT" },
-    { name: "Malachi", usfm: "MAL", file: "Malachi", chapters: 4, testament: "OT" },
-    { name: "Matthew", usfm: "MAT", file: "Matthew", chapters: 28, testament: "NT" },
-    { name: "Mark", usfm: "MRK", file: "Mark", chapters: 16, testament: "NT" },
-    { name: "Luke", usfm: "LUK", file: "Luke", chapters: 24, testament: "NT" },
-    { name: "John", usfm: "JHN", file: "John", chapters: 21, testament: "NT" },
-    { name: "Acts", usfm: "ACT", file: "Acts", chapters: 28, testament: "NT" },
-    { name: "Romans", usfm: "ROM", file: "Romans", chapters: 16, testament: "NT" },
-    { name: "1 Corinthians", usfm: "1CO", file: "1Corinthians", chapters: 16, testament: "NT" },
-    { name: "2 Corinthians", usfm: "2CO", file: "2Corinthians", chapters: 13, testament: "NT" },
-    { name: "Galatians", usfm: "GAL", file: "Galatians", chapters: 6, testament: "NT" },
-    { name: "Ephesians", usfm: "EPH", file: "Ephesians", chapters: 6, testament: "NT" },
-    { name: "Philippians", usfm: "PHP", file: "Philippians", chapters: 4, testament: "NT" },
-    { name: "Colossians", usfm: "COL", file: "Colossians", chapters: 4, testament: "NT" },
-    { name: "1 Thessalonians", usfm: "1TH", file: "1Thessalonians", chapters: 5, testament: "NT" },
-    { name: "2 Thessalonians", usfm: "2TH", file: "2Thessalonians", chapters: 3, testament: "NT" },
-    { name: "1 Timothy", usfm: "1TI", file: "1Timothy", chapters: 6, testament: "NT" },
-    { name: "2 Timothy", usfm: "2TI", file: "2Timothy", chapters: 4, testament: "NT" },
-    { name: "Titus", usfm: "TIT", file: "Titus", chapters: 3, testament: "NT" },
-    { name: "Philemon", usfm: "PHM", file: "Philemon", chapters: 1, testament: "NT" },
-    { name: "Hebrews", usfm: "HEB", file: "Hebrews", chapters: 13, testament: "NT" },
-    { name: "James", usfm: "JAS", file: "James", chapters: 5, testament: "NT" },
-    { name: "1 Peter", usfm: "1PE", file: "1Peter", chapters: 5, testament: "NT" },
-    { name: "2 Peter", usfm: "2PE", file: "2Peter", chapters: 3, testament: "NT" },
-    { name: "1 John", usfm: "1JN", file: "1John", chapters: 5, testament: "NT" },
-    { name: "2 John", usfm: "2JN", file: "2John", chapters: 1, testament: "NT" },
-    { name: "3 John", usfm: "3JN", file: "3John", chapters: 1, testament: "NT" },
-    { name: "Jude", usfm: "JUD", file: "Jude", chapters: 1, testament: "NT" },
-    { name: "Revelation", usfm: "REV", file: "Revelation", chapters: 22, testament: "NT" },
+    { name: "Genesis", nameEs: "Génesis", usfm: "GEN", file: "Genesis", chapters: 50, testament: "OT" },
+    { name: "Exodus", nameEs: "Éxodo", usfm: "EXO", file: "Exodus", chapters: 40, testament: "OT" },
+    { name: "Leviticus", nameEs: "Levítico", usfm: "LEV", file: "Leviticus", chapters: 27, testament: "OT" },
+    { name: "Numbers", nameEs: "Números", usfm: "NUM", file: "Numbers", chapters: 36, testament: "OT" },
+    { name: "Deuteronomy", nameEs: "Deuteronomio", usfm: "DEU", file: "Deuteronomy", chapters: 34, testament: "OT" },
+    { name: "Joshua", nameEs: "Josué", usfm: "JOS", file: "Joshua", chapters: 24, testament: "OT" },
+    { name: "Judges", nameEs: "Jueces", usfm: "JDG", file: "Judges", chapters: 21, testament: "OT" },
+    { name: "Ruth", nameEs: "Rut", usfm: "RUT", file: "Ruth", chapters: 4, testament: "OT" },
+    { name: "1 Samuel", nameEs: "1 Samuel", usfm: "1SA", file: "1Samuel", chapters: 31, testament: "OT" },
+    { name: "2 Samuel", nameEs: "2 Samuel", usfm: "2SA", file: "2Samuel", chapters: 24, testament: "OT" },
+    { name: "1 Kings", nameEs: "1 Reyes", usfm: "1KI", file: "1Kings", chapters: 22, testament: "OT" },
+    { name: "2 Kings", nameEs: "2 Reyes", usfm: "2KI", file: "2Kings", chapters: 25, testament: "OT" },
+    { name: "1 Chronicles", nameEs: "1 Crónicas", usfm: "1CH", file: "1Chronicles", chapters: 29, testament: "OT" },
+    { name: "2 Chronicles", nameEs: "2 Crónicas", usfm: "2CH", file: "2Chronicles", chapters: 36, testament: "OT" },
+    { name: "Ezra", nameEs: "Esdras", usfm: "EZR", file: "Ezra", chapters: 10, testament: "OT" },
+    { name: "Nehemiah", nameEs: "Nehemías", usfm: "NEH", file: "Nehemiah", chapters: 13, testament: "OT" },
+    { name: "Esther", nameEs: "Ester", usfm: "EST", file: "Esther", chapters: 10, testament: "OT" },
+    { name: "Job", nameEs: "Job", usfm: "JOB", file: "Job", chapters: 42, testament: "OT" },
+    { name: "Psalms", nameEs: "Salmos", usfm: "PSA", file: "Psalms", chapters: 150, testament: "OT" },
+    { name: "Proverbs", nameEs: "Proverbios", usfm: "PRO", file: "Proverbs", chapters: 31, testament: "OT" },
+    { name: "Ecclesiastes", nameEs: "Eclesiastés", usfm: "ECC", file: "Ecclesiastes", chapters: 12, testament: "OT" },
+    { name: "Song of Solomon", nameEs: "Cantares", usfm: "SNG", file: "SongofSolomon", chapters: 8, testament: "OT" },
+    { name: "Isaiah", nameEs: "Isaías", usfm: "ISA", file: "Isaiah", chapters: 66, testament: "OT" },
+    { name: "Jeremiah", nameEs: "Jeremías", usfm: "JER", file: "Jeremiah", chapters: 52, testament: "OT" },
+    { name: "Lamentations", nameEs: "Lamentaciones", usfm: "LAM", file: "Lamentations", chapters: 5, testament: "OT" },
+    { name: "Ezekiel", nameEs: "Ezequiel", usfm: "EZK", file: "Ezekiel", chapters: 48, testament: "OT" },
+    { name: "Daniel", nameEs: "Daniel", usfm: "DAN", file: "Daniel", chapters: 12, testament: "OT" },
+    { name: "Hosea", nameEs: "Oseas", usfm: "HOS", file: "Hosea", chapters: 14, testament: "OT" },
+    { name: "Joel", nameEs: "Joel", usfm: "JOL", file: "Joel", chapters: 3, testament: "OT" },
+    { name: "Amos", nameEs: "Amós", usfm: "AMO", file: "Amos", chapters: 9, testament: "OT" },
+    { name: "Obadiah", nameEs: "Abdías", usfm: "OBA", file: "Obadiah", chapters: 1, testament: "OT" },
+    { name: "Jonah", nameEs: "Jonás", usfm: "JON", file: "Jonah", chapters: 4, testament: "OT" },
+    { name: "Micah", nameEs: "Miqueas", usfm: "MIC", file: "Micah", chapters: 7, testament: "OT" },
+    { name: "Nahum", nameEs: "Nahúm", usfm: "NAM", file: "Nahum", chapters: 3, testament: "OT" },
+    { name: "Habakkuk", nameEs: "Habacuc", usfm: "HAB", file: "Habakkuk", chapters: 3, testament: "OT" },
+    { name: "Zephaniah", nameEs: "Sofonías", usfm: "ZEP", file: "Zephaniah", chapters: 3, testament: "OT" },
+    { name: "Haggai", nameEs: "Hageo", usfm: "HAG", file: "Haggai", chapters: 2, testament: "OT" },
+    { name: "Zechariah", nameEs: "Zacarías", usfm: "ZEC", file: "Zechariah", chapters: 14, testament: "OT" },
+    { name: "Malachi", nameEs: "Malaquías", usfm: "MAL", file: "Malachi", chapters: 4, testament: "OT" },
+    { name: "Matthew", nameEs: "Mateo", usfm: "MAT", file: "Matthew", chapters: 28, testament: "NT" },
+    { name: "Mark", nameEs: "Marcos", usfm: "MRK", file: "Mark", chapters: 16, testament: "NT" },
+    { name: "Luke", nameEs: "Lucas", usfm: "LUK", file: "Luke", chapters: 24, testament: "NT" },
+    { name: "John", nameEs: "Juan", usfm: "JHN", file: "John", chapters: 21, testament: "NT" },
+    { name: "Acts", nameEs: "Hechos", usfm: "ACT", file: "Acts", chapters: 28, testament: "NT" },
+    { name: "Romans", nameEs: "Romanos", usfm: "ROM", file: "Romans", chapters: 16, testament: "NT" },
+    { name: "1 Corinthians", nameEs: "1 Corintios", usfm: "1CO", file: "1Corinthians", chapters: 16, testament: "NT" },
+    { name: "2 Corinthians", nameEs: "2 Corintios", usfm: "2CO", file: "2Corinthians", chapters: 13, testament: "NT" },
+    { name: "Galatians", nameEs: "Gálatas", usfm: "GAL", file: "Galatians", chapters: 6, testament: "NT" },
+    { name: "Ephesians", nameEs: "Efesios", usfm: "EPH", file: "Ephesians", chapters: 6, testament: "NT" },
+    { name: "Philippians", nameEs: "Filipenses", usfm: "PHP", file: "Philippians", chapters: 4, testament: "NT" },
+    { name: "Colossians", nameEs: "Colosenses", usfm: "COL", file: "Colossians", chapters: 4, testament: "NT" },
+    { name: "1 Thessalonians", nameEs: "1 Tesalonicenses", usfm: "1TH", file: "1Thessalonians", chapters: 5, testament: "NT" },
+    { name: "2 Thessalonians", nameEs: "2 Tesalonicenses", usfm: "2TH", file: "2Thessalonians", chapters: 3, testament: "NT" },
+    { name: "1 Timothy", nameEs: "1 Timoteo", usfm: "1TI", file: "1Timothy", chapters: 6, testament: "NT" },
+    { name: "2 Timothy", nameEs: "2 Timoteo", usfm: "2TI", file: "2Timothy", chapters: 4, testament: "NT" },
+    { name: "Titus", nameEs: "Tito", usfm: "TIT", file: "Titus", chapters: 3, testament: "NT" },
+    { name: "Philemon", nameEs: "Filemón", usfm: "PHM", file: "Philemon", chapters: 1, testament: "NT" },
+    { name: "Hebrews", nameEs: "Hebreos", usfm: "HEB", file: "Hebrews", chapters: 13, testament: "NT" },
+    { name: "James", nameEs: "Santiago", usfm: "JAS", file: "James", chapters: 5, testament: "NT" },
+    { name: "1 Peter", nameEs: "1 Pedro", usfm: "1PE", file: "1Peter", chapters: 5, testament: "NT" },
+    { name: "2 Peter", nameEs: "2 Pedro", usfm: "2PE", file: "2Peter", chapters: 3, testament: "NT" },
+    { name: "1 John", nameEs: "1 Juan", usfm: "1JN", file: "1John", chapters: 5, testament: "NT" },
+    { name: "2 John", nameEs: "2 Juan", usfm: "2JN", file: "2John", chapters: 1, testament: "NT" },
+    { name: "3 John", nameEs: "3 Juan", usfm: "3JN", file: "3John", chapters: 1, testament: "NT" },
+    { name: "Jude", nameEs: "Judas", usfm: "JUD", file: "Jude", chapters: 1, testament: "NT" },
+    { name: "Revelation", nameEs: "Apocalipsis", usfm: "REV", file: "Revelation", chapters: 22, testament: "NT" },
   ];
   function bookByName(name) { return BOOKS.find((b) => b.name === name) || null; }
+  // Book names stay in English internally throughout -- aliases, tab refs,
+  // outline refs, backups, everything -- so nothing in the data layer had
+  // to change for this. Only the DISPLAY name switches with the language,
+  // through this one helper used everywhere a book name reaches the screen.
+  function bookDisplayName(book) {
+    if (!book) return "";
+    return (state.uiLang === "es" && book.nameEs) ? book.nameEs : book.name;
+  }
 
   const ALIASES = {
     Genesis: ["genesis", "gen", "ge", "gn"], Exodus: ["exodus", "exod", "exo", "ex"],
@@ -1215,8 +1233,19 @@
     BBE: { id: "BBE", name: "Bible in Basic English", bulk: false, apiId: "bbe" },
     DARBY: { id: "DARBY", name: "Darby Bible", bulk: false, apiId: "darby" },
     YLT: { id: "YLT", name: "Young's Literal Translation", bulk: false, apiId: "ylt", ntOnly: true },
+    // Reina-Valera 1909 (not 1960): the 1960 revision most people mean when
+    // they just say "Reina Valera" is still under active copyright
+    // (Sociedades B\u00edblicas Unidas / American Bible Society) -- the exact
+    // same situation as NIV/NKJV in English. 1909 is the standard public-
+    // domain choice for this reason, confirmed by openbible.info, scrollmapper,
+    // and the Reina-Valera repo itself. No live-fetch fallback is wired up
+    // (bible-api.com doesn't carry a Spanish translation as of this writing),
+    // so this one only works once downloaded -- see the apiId-less guard in
+    // fetchLiveChapter.
+    RV1909: { id: "RV1909", name: "Reina-Valera 1909", bulk: true,
+      bookUrl: (b) => `https://raw.githubusercontent.com/aruljohn/Reina-Valera/master/${b.file}.json` },
   };
-  const TR_ORDER = ["KJV", "WEB", "ASV", "BBE", "DARBY", "YLT"];
+  const TR_ORDER = ["KJV", "WEB", "ASV", "BBE", "DARBY", "YLT", "RV1909"];
 
   function parseAruljohnBook(json) {
     const out = [];
@@ -1409,6 +1438,9 @@
     const src = TRANSLATIONS[trId];
     if (src.ntOnly && book.testament !== "NT") {
       throw new Error(`${trId} only covers the New Testament`);
+    }
+    if (!src.apiId) {
+      throw new Error(`${trId} needs to be downloaded first \u2014 no live preview available for this one`);
     }
     const url = `https://bible-api.com/data/${src.apiId}/${book.usfm}/${chapter}`;
     const res = await fetch(url);
@@ -2144,6 +2176,7 @@
     returnCtx: null,
     journalMode: "prayer",
     outlineEditingId: null,
+    uiLang: localStorage.getItem("berea.uiLang") || "en",
   };
   let searchIndexCache = {};
 
@@ -2152,6 +2185,139 @@
 
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  /* =====================================================================
+     Language (English / Spanish)
+     ---------------------------------------------------------------------
+     Covers the interactive app in full: navigation, buttons, hints,
+     sheets, toasts. Deliberately does NOT cover the long-form reference
+     prose (the in-app how-to guide and the apologetics essays are several
+     thousand words of running text each) -- translating those well is a
+     genuinely separate undertaking from translating an interface, and
+     doing it hastily alongside everything else risked doing both badly.
+     They stay in English for now and are the natural next step.
+
+     t(key) looks up the current language, falls back to English, then to
+     the key itself, so a missing translation degrades to *something*
+     readable rather than a blank string or a crash. Static markup is
+     tagged with data-i18n / data-i18n-placeholder and refreshed by
+     applyStaticLanguage(); dynamic view content is re-rendered by calling
+     the language switch handler, since those views already rebuild their
+     own HTML from `t()` calls on every render.
+  ===================================================================== */
+  const STRINGS = {
+    en: {
+      app_name: "Berea",
+      nav_read: "Read", nav_compare: "Compare", nav_search: "Search", nav_study: "Study", nav_journal: "Journal",
+      loading: "Loading\u2026",
+      search_mode_verses: "Verses", search_mode_tabs: "Tabs", search_mode_topics: "Topics", search_mode_words: "Words",
+      search_verses_placeholder: "Search the text\u2026",
+      search_tabs_placeholder: "Search your tabs by name or reference\u2026",
+      search_topics_placeholder: "Search topics \u2014 faith, forgiveness, prayer\u2026",
+      search_words_placeholder: "An English word or Strong's number \u2014 mercy, agape, H2617\u2026",
+      go: "Go",
+      journal_mode_prayer: "Prayer", journal_mode_plan: "Plan", journal_mode_memory: "Memory", journal_mode_outline: "Outlines",
+      compare_hint: "Pick two translations to read the same passage side by side, like an open book. Tap any verse to highlight it or pin it.",
+      library_menu: "\u2630 Berea",
+      close: "Close", cancel: "Cancel", copy: "Copy", copied: "Copied", delete: "Delete", save: "Save",
+      add: "Add", share: "Share\u2026", back: "\u2039 Back",
+      tab_add: "+ tab",
+      vs_pin_new: "Pin as new tab", vs_add_existing: "Add to existing tab\u2026",
+      vs_ask_ai: "\u2726 Find cross-references (AI)", vs_xref: "\u{1F4DA} Traditional cross-references (TSK)",
+      vs_memorize: "\u{1F9E0} Add to memory verses", vs_copy: "Copy text",
+      vs_label_prompt: "Label for this tab?", vs_pinned: "Pinned as tab",
+      vs_added_to: "Added to", vs_note_placeholder: "Your note on this verse\u2026",
+      vs_memorized: "Added to memory verses",
+      start_study: "Start a Study", have_code: "Have a code?", join: "Join",
+      code_placeholder: "6-letter code", leave_study: "Leave study",
+      take_lead: "Take the lead", follow_along: "Follow along automatically",
+      share_markup: "Share highlights & notes with the group", copy_link: "Copy link",
+      link_copied: "Link copied", room_code: "Room code",
+      your_name: "Your name", change: "Change",
+      study_invited: "You've been invited to a study \u2014 code",
+      study_name_q: "What name should the group see?", study_join_btn: "Join study",
+      guest_default: "Guest",
+      study_intro_hint: "Start a study to read together in real time. Everyone stays in sync as the leader moves through a passage, and the group keeps going even if whoever started it drops off.",
+      study_share_hint: "Share this link in your messaging app \u2014 anyone who opens it joins instantly.",
+      study_in_this: "In this study", study_you_tap_rename: " (you \u2014 tap to rename)",
+      study_leading_tag: "LEADING",
+      study_leading_hint: "You're leading \u2014 your navigation moves everyone who's following along.",
+      study_share_markup_hint: "Off by default. When on, highlights and notes you make from now on are sent to everyone else who also has this on \u2014 and theirs are saved to your copy. Leave it off to read along and mark up privately.",
+      study_send_marks_for: "Send my existing marks for",
+      study_sharing_on: "Sharing highlights & notes", study_sharing_off: "Highlights & notes are private again",
+      study_share_title: "Join our Bible study",
+    },
+    es: {
+      app_name: "Berea",
+      nav_read: "Leer", nav_compare: "Comparar", nav_search: "Buscar", nav_study: "Estudio", nav_journal: "Diario",
+      loading: "Cargando\u2026",
+      search_mode_verses: "Vers\u00edculos", search_mode_tabs: "Pesta\u00f1as", search_mode_topics: "Temas", search_mode_words: "Palabras",
+      search_verses_placeholder: "Buscar en el texto\u2026",
+      search_tabs_placeholder: "Buscar tus pesta\u00f1as por nombre o referencia\u2026",
+      search_topics_placeholder: "Buscar temas \u2014 fe, perd\u00f3n, oraci\u00f3n\u2026",
+      search_words_placeholder: "Una palabra en espa\u00f1ol/ingl\u00e9s o n\u00famero Strong \u2014 misericordia, agape, H2617\u2026",
+      go: "Ir",
+      journal_mode_prayer: "Oraci\u00f3n", journal_mode_plan: "Plan", journal_mode_memory: "Memoria", journal_mode_outline: "Bosquejos",
+      compare_hint: "Elige dos traducciones para leer el mismo pasaje en paralelo, como un libro abierto. Toca cualquier vers\u00edculo para resaltarlo o guardarlo.",
+      library_menu: "\u2630 Berea",
+      close: "Cerrar", cancel: "Cancelar", copy: "Copiar", copied: "Copiado", delete: "Eliminar", save: "Guardar",
+      add: "A\u00f1adir", share: "Compartir\u2026", back: "\u2039 Volver",
+      tab_add: "+ pesta\u00f1a",
+      vs_pin_new: "Guardar como pesta\u00f1a nueva", vs_add_existing: "A\u00f1adir a una pesta\u00f1a\u2026",
+      vs_ask_ai: "\u2726 Buscar referencias cruzadas (IA)", vs_xref: "\u{1F4DA} Referencias cruzadas tradicionales (TSK)",
+      vs_memorize: "\u{1F9E0} A\u00f1adir a vers\u00edculos de memoria", vs_copy: "Copiar texto",
+      vs_label_prompt: "\u00bfEtiqueta para esta pesta\u00f1a?", vs_pinned: "Guardado como pesta\u00f1a",
+      vs_added_to: "A\u00f1adido a", vs_note_placeholder: "Tu nota sobre este vers\u00edculo\u2026",
+      vs_memorized: "A\u00f1adido a vers\u00edculos de memoria",
+      start_study: "Iniciar un Estudio", have_code: "\u00bfTienes un c\u00f3digo?", join: "Unirse",
+      code_placeholder: "C\u00f3digo de 6 letras", leave_study: "Salir del estudio",
+      take_lead: "Tomar el liderazgo", follow_along: "Seguir autom\u00e1ticamente",
+      share_markup: "Compartir resaltados y notas con el grupo", copy_link: "Copiar enlace",
+      link_copied: "Enlace copiado", room_code: "C\u00f3digo de la sala",
+      your_name: "Tu nombre", change: "Cambiar",
+      study_invited: "Has sido invitado a un estudio \u2014 c\u00f3digo",
+      study_name_q: "\u00bfQu\u00e9 nombre debe ver el grupo?", study_join_btn: "Unirse al estudio",
+      guest_default: "Invitado",
+      study_intro_hint: "Inicia un estudio para leer juntos en tiempo real. Todos se mantienen sincronizados mientras el l\u00edder avanza por el pasaje, y el grupo sigue funcionando aunque quien lo inici\u00f3 se desconecte.",
+      study_share_hint: "Comparte este enlace en tu app de mensajer\u00eda \u2014 quien lo abra se une al instante.",
+      study_in_this: "En este estudio", study_you_tap_rename: " (t\u00fa \u2014 toca para cambiar el nombre)",
+      study_leading_tag: "LIDERANDO",
+      study_leading_hint: "Est\u00e1s liderando \u2014 tu navegaci\u00f3n mueve a todos los que est\u00e1n siguiendo.",
+      study_share_markup_hint: "Desactivado por defecto. Al activarlo, los resaltados y notas que hagas de ahora en adelante se env\u00edan a todos los que tambi\u00e9n lo tengan activado \u2014 y los suyos se guardan en tu copia. D\u00e9jalo desactivado para leer y marcar en privado.",
+      study_send_marks_for: "Enviar mis marcas actuales de",
+      study_sharing_on: "Compartiendo resaltados y notas", study_sharing_off: "Resaltados y notas vuelven a ser privados",
+      study_share_title: "\u00danete a nuestro estudio b\u00edblico",
+    },
+  };
+
+  function t(key) {
+    const lang = state.uiLang === "es" ? "es" : "en";
+    return (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key] || key;
+  }
+
+  // Re-applies text to every static element tagged with data-i18n /
+  // data-i18n-placeholder. Dynamic views (anything built by a render*
+  // function) already call t() on every render, so switching language
+  // just means re-running whichever render function produced the view
+  // currently on screen -- handled by setLanguage(), not here.
+  function applyStaticLanguage() {
+    document.title = t("app_name") + " \u2014 Study Bible";
+    $$("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    $$("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+    $$("#langToggle button").forEach((b) => b.classList.toggle("active", b.dataset.lang === state.uiLang));
+  }
+
+  function setLanguage(lang) {
+    state.uiLang = lang === "es" ? "es" : "en";
+    localStorage.setItem("berea.uiLang", state.uiLang);
+    applyStaticLanguage();
+    // Re-run whichever render produced the view currently on screen, so it
+    // rebuilds its HTML through the same t() calls with the new language.
+    // "tab" isn't one of setView's own branches (it's reached through
+    // openTab, not the bottom nav), so it needs its own case here.
+    if (state.view === "tab" && state.activeTabId) openTab(state.activeTabId);
+    else setView(state.view);
   }
 
   function toast(msg) {
@@ -2178,7 +2344,14 @@
   }
 
   function refLabel(book, chapter, verseStart, verseEnd) {
-    let s = `${book} ${chapter}`;
+    // `book` is always the canonical English name here -- that's what's
+    // stored in every ref (tabs, outlines, cross-references, backups) --
+    // only the DISPLAYED name changes with the language, via bookByName.
+    // This is the one place that needed updating for every reference
+    // label across the app (tabs, search results, sheets, outlines) to
+    // show Spanish book names, since all of them already call refLabel.
+    const display = state.uiLang === "es" ? bookDisplayName(bookByName(book)) || book : book;
+    let s = `${display} ${chapter}`;
     if (verseStart) s += verseEnd && verseEnd !== verseStart ? `:${verseStart}-${verseEnd}` : `:${verseStart}`;
     return s;
   }
@@ -2291,10 +2464,10 @@
 
   async function renderRead() {
     stopReading();
-    $("#refBtn").textContent = `${state.book.name} ${state.chapter}`;
+    $("#refBtn").textContent = `${bookDisplayName(state.book)} ${state.chapter}`;
     $("#trBadge").value = state.readTr;
-    $("#readChapterTitle").textContent = `${state.book.name} ${state.chapter}`;
-    $("#readBody").innerHTML = `<div class="page-loading">Loading…</div>`;
+    $("#readChapterTitle").textContent = `${bookDisplayName(state.book)} ${state.chapter}`;
+    $("#readBody").innerHTML = `<div class="page-loading">${t("loading")}</div>`;
     renderBackToResults();
     try {
       const [rows, hl, notes] = await Promise.all([
@@ -2319,14 +2492,15 @@
         rows.map((r) => renderVerseHtml(r, hl, state.verseFocus, notes, tokenMap)).join("");
       state.verseFocus = null;
     } catch (e) {
-      const msg = (e && e.message && e.message.includes("only covers")) ? e.message : "Couldn't load this chapter. Check your connection and try again.";
+      const friendly = e && e.message && (e.message.includes("only covers") || e.message.includes("needs to be downloaded"));
+      const msg = friendly ? e.message : "Couldn't load this chapter. Check your connection and try again.";
       $("#readBody").innerHTML = `<div class="hint">${escapeHtml(msg)}</div>`;
     }
   }
 
   /* ---- Compare view ---- */
   async function renderCompare() {
-    $("#refBtn").textContent = `${state.book.name} ${state.chapter}`;
+    $("#refBtn").textContent = `${bookDisplayName(state.book)} ${state.chapter}`;
     const spread = $("#compareSpread");
     spread.innerHTML = ["compareLeft", "compareRight"].map((key, i) => `
       <div class="page">
@@ -2782,6 +2956,7 @@
       card.className = "trcard";
       const statusText = meta && meta.downloaded ? "Downloaded — full offline access"
         : meta && meta.partial ? `Mostly downloaded (${meta.failedBooks.length} book(s) skipped — tap Retry)`
+        : src.bulk && !src.apiId ? "Not downloaded yet — download required, no live preview for this one"
         : src.bulk ? "Not downloaded yet — chapters load live as you read"
         : "Loads live as you read; caches automatically for offline reuse";
       card.innerHTML = `
@@ -2824,20 +2999,22 @@
   function closePicker() { $("#pickerBackdrop").classList.remove("show"); }
 
   function renderPickerBooks() {
-    $("#pickerTitle").textContent = "Choose a book";
+    $("#pickerTitle").textContent = state.uiLang === "es" ? "Elige un libro" : "Choose a book";
     const ot = BOOKS.filter((b) => b.testament === "OT");
     const nt = BOOKS.filter((b) => b.testament === "NT");
+    const otLabel = state.uiLang === "es" ? "Antiguo Testamento" : "Old Testament";
+    const ntLabel = state.uiLang === "es" ? "Nuevo Testamento" : "New Testament";
     const section = (label, list) => `<div class="testament-label">${label}</div><div class="book-grid">${
-      list.map((b) => `<button class="book-btn" data-book="${escapeHtml(b.name)}">${b.name}</button>`).join("")
+      list.map((b) => `<button class="book-btn" data-book="${escapeHtml(b.name)}">${escapeHtml(bookDisplayName(b))}</button>`).join("")
     }</div>`;
-    $("#pickerBody").innerHTML = section("Old Testament", ot) + section("New Testament", nt);
+    $("#pickerBody").innerHTML = section(otLabel, ot) + section(ntLabel, nt);
     $("#pickerBody").querySelectorAll(".book-btn").forEach((btn) => {
       btn.addEventListener("click", () => renderPickerChapters(bookByName(btn.dataset.book)));
     });
   }
 
   function renderPickerChapters(book) {
-    $("#pickerTitle").textContent = book.name;
+    $("#pickerTitle").textContent = bookDisplayName(book);
     const nums = Array.from({ length: book.chapters }, (_, i) => i + 1);
     $("#pickerBody").innerHTML =
       `<div class="back-row"><button id="backToBooks">‹ All books</button></div>` +
@@ -2853,6 +3030,62 @@
         broadcastNavIfLeader();
       });
     });
+  }
+
+  // Moves to the next/previous chapter, crossing a book boundary at either
+  // end (Genesis 1's "previous" and Revelation's last chapter's "next" are
+  // simply no-ops -- there's nowhere further to go). Shared by the swipe
+  // gesture below and available for any other "next/previous chapter"
+  // control that might want it later.
+  function goToAdjacentChapter(delta) {
+    let chapter = state.chapter + delta;
+    let book = state.book;
+    const idx = BOOKS.findIndex((b) => b.name === book.name);
+    if (chapter < 1) {
+      if (idx <= 0) return;
+      book = BOOKS[idx - 1];
+      chapter = book.chapters;
+    } else if (chapter > book.chapters) {
+      if (idx >= BOOKS.length - 1) return;
+      book = BOOKS[idx + 1];
+      chapter = 1;
+    }
+    state.book = book;
+    state.chapter = chapter;
+    state.verseFocus = null;
+    clearReturnContext();
+    setView("read");
+    broadcastNavIfLeader();
+  }
+
+  // Swipe-to-change-chapter, scoped to the Read view's verse area only --
+  // Compare and Tab views already use horizontal swipe for their own
+  // purpose (paging between facing translations), so this listens on
+  // #readBody specifically rather than anything broader, and bails out
+  // immediately if some other view is active by the time the gesture ends
+  // (e.g. a study-session nav message switched views mid-swipe).
+  // touchstart/touchend only, no preventDefault anywhere -- normal
+  // vertical scrolling and verse taps are completely untouched by this.
+  let swipeStartX = null, swipeStartY = null, swipeStartTime = null;
+  const SWIPE_MIN_DIST = 60;      // px of horizontal travel to count as a swipe
+  const SWIPE_MAX_OFF_AXIS = 60;  // px of vertical drift before it's a scroll, not a swipe
+  const SWIPE_MAX_TIME = 700;     // ms -- slow drags don't count, only real swipes
+
+  function onReadTouchStart(ev) {
+    if (state.view !== "read" || !ev.touches.length) { swipeStartX = null; return; }
+    swipeStartX = ev.touches[0].clientX;
+    swipeStartY = ev.touches[0].clientY;
+    swipeStartTime = Date.now();
+  }
+  function onReadTouchEnd(ev) {
+    if (swipeStartX === null || state.view !== "read" || !ev.changedTouches.length) { swipeStartX = null; return; }
+    const touch = ev.changedTouches[0];
+    const dx = touch.clientX - swipeStartX;
+    const dy = touch.clientY - swipeStartY;
+    const dt = Date.now() - swipeStartTime;
+    swipeStartX = null;
+    if (dt > SWIPE_MAX_TIME || Math.abs(dy) > SWIPE_MAX_OFF_AXIS || Math.abs(dx) < SWIPE_MIN_DIST) return;
+    goToAdjacentChapter(dx < 0 ? 1 : -1); // swipe left -> next, swipe right -> previous
   }
 
   /* =====================================================================
@@ -2877,8 +3110,9 @@
   function openVerseSheet(bookName, chapter, verse, text) {
     sheetCtx = { book: bookName, chapter, verse, text };
     const noteRef = `${bookName}|${chapter}|${verse}`;
-    $("#vsRef").textContent = `${bookName} ${chapter}:${verse}`;
+    $("#vsRef").textContent = refLabel(bookName, chapter, verse, verse);
     $("#vsText").textContent = text;
+    $("#vsNoteInput").placeholder = t("vs_note_placeholder");
     $("#vsNoteInput").value = "";
     $("#vsNoteStatus").textContent = "";
     getNote(noteRef).then((existing) => { $("#vsNoteInput").value = existing || ""; });
@@ -2901,45 +3135,48 @@
       });
     });
 
-    const tabs = loadTabs();
-    let actions = `<button class="primary" id="vsPinNew">Pin as new tab</button>`;
-    if (tabs.length) {
-      actions += `<select id="vsAddExisting"><option value="">Add to existing tab…</option>${
-        tabs.map((t) => `<option value="${t.id}">${escapeHtml(t.label)}</option>`).join("")}</select>`;
+    // Renamed from the more natural `t` to `tabsList` here specifically --
+    // this function calls the i18n t() helper throughout, and a local `t`
+    // holding a tabs array would silently shadow it within this scope.
+    const tabsList = loadTabs();
+    let actions = `<button class="primary" id="vsPinNew">${t("vs_pin_new")}</button>`;
+    if (tabsList.length) {
+      actions += `<select id="vsAddExisting"><option value="">${t("vs_add_existing")}</option>${
+        tabsList.map((tb) => `<option value="${tb.id}">${escapeHtml(tb.label)}</option>`).join("")}</select>`;
     }
-    actions += `<button id="vsAskAi">✦ Find cross-references (AI)</button>`;
-    actions += `<button id="vsXref">\u{1F4DA} Traditional cross-references (TSK)</button>`;
-    actions += `<button id="vsMemorize">\u{1F9E0} Add to memory verses</button>`;
-    actions += `<button id="vsCopy">Copy text</button><button id="vsClose">Close</button>`;
+    actions += `<button id="vsAskAi">${t("vs_ask_ai")}</button>`;
+    actions += `<button id="vsXref">${t("vs_xref")}</button>`;
+    actions += `<button id="vsMemorize">${t("vs_memorize")}</button>`;
+    actions += `<button id="vsCopy">${t("vs_copy")}</button><button id="vsClose">${t("close")}</button>`;
     $("#vsActions").innerHTML = actions;
 
     $("#vsPinNew").addEventListener("click", () => {
-      const label = prompt("Label for this tab?", `${bookName} ${chapter}:${verse}`);
+      const label = prompt(t("vs_label_prompt"), refLabel(bookName, chapter, verse, verse));
       if (!label) return;
-      const t = loadTabs();
+      const tabsNow = loadTabs();
       const newTab = { id: "t_" + Date.now(), label, translationId: state.readTr,
         refs: [{ book: bookName, chapter, verseStart: verse, verseEnd: verse }] };
-      t.push(newTab);
-      saveTabs(t);
+      tabsNow.push(newTab);
+      saveTabs(tabsNow);
       renderTabStrip();
       broadcastTabAdd(newTab);
       closeVerseSheet();
-      toast("Pinned as tab");
+      toast(t("vs_pinned"));
     });
     $("#vsAddExisting")?.addEventListener("change", (ev) => {
       const id = ev.target.value;
       if (!id) return;
-      const t = loadTabs();
-      const tab = t.find((x) => x.id === id);
+      const tabsNow = loadTabs();
+      const tab = tabsNow.find((x) => x.id === id);
       tab.refs.push({ book: bookName, chapter, verseStart: verse, verseEnd: verse });
-      saveTabs(t);
+      saveTabs(tabsNow);
       broadcastTabUpdate(tab.id, tab.refs);
       closeVerseSheet();
-      toast("Added to " + tab.label);
+      toast(t("vs_added_to") + " " + tab.label);
     });
     $("#vsCopy").addEventListener("click", () => {
-      const s = `${bookName} ${chapter}:${verse} — ${text}`;
-      if (navigator.clipboard) navigator.clipboard.writeText(s).then(() => toast("Copied"));
+      const s = `${refLabel(bookName, chapter, verse, verse)} — ${text}`;
+      if (navigator.clipboard) navigator.clipboard.writeText(s).then(() => toast(t("copied")));
       closeVerseSheet();
     });
     $("#vsAskAi").addEventListener("click", () => {
@@ -2954,7 +3191,7 @@
       const ref = `${bookName}|${chapter}|${verse}`;
       await saveMemoryVerse(ref, text, state.readTr);
       closeVerseSheet();
-      toast("Added to memory verses");
+      toast(t("vs_memorized"));
     });
     $("#vsClose").addEventListener("click", closeVerseSheet);
 
@@ -3255,7 +3492,7 @@
     const cfg = getAiConfig();
     const who = cfg ? (cfg.provider === "anthropic" ? "Claude" : cfg.provider === "openai" ? "OpenAI" : "Custom provider") : null;
     wrap.innerHTML = `
-      <button class="dl" id="aiAskChapterBtn" style="width:100%;margin-bottom:10px">\u2726 Get a correlation prompt for ${escapeHtml(state.book.name)} ${state.chapter}</button>
+      <button class="dl" id="aiAskChapterBtn" style="width:100%;margin-bottom:10px">\u2726 Get a correlation prompt for ${escapeHtml(bookDisplayName(state.book))} ${state.chapter}</button>
       <div class="trcard">
         <div class="trcard-head">
           <div>
@@ -5358,13 +5595,13 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         // here (rather than a prompt() fired from a timer) is what makes
         // this reliable across browsers.
         wrap.innerHTML = `
-          <div class="hint">You've been invited to a study \u2014 code <strong>${escapeHtml(mesh.pendingAutoJoinCode)}</strong>. What name should the group see?</div>
-          <input id="autoJoinNameInput" class="code-input" type="text" placeholder="Your name" style="text-transform:none;margin-bottom:10px" autocomplete="off">
-          <button class="dl" id="autoJoinBtn" style="width:100%">Join study</button>
+          <div class="hint">${t("study_invited")} <strong>${escapeHtml(mesh.pendingAutoJoinCode)}</strong>. ${t("study_name_q")}</div>
+          <input id="autoJoinNameInput" class="code-input" type="text" placeholder="${escapeHtml(t("your_name"))}" style="text-transform:none;margin-bottom:10px" autocomplete="off">
+          <button class="dl" id="autoJoinBtn" style="width:100%">${t("study_join_btn")}</button>
         `;
         $("#autoJoinNameInput").focus();
         $("#autoJoinBtn").addEventListener("click", () => {
-          const name = $("#autoJoinNameInput").value.trim() || "Guest";
+          const name = $("#autoJoinNameInput").value.trim() || t("guest_default");
           localStorage.setItem("berea.name", name);
           const code = mesh.pendingAutoJoinCode;
           mesh.pendingAutoJoinCode = null;
@@ -5379,14 +5616,14 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       }
       const knownName = localStorage.getItem("berea.name");
       wrap.innerHTML = `
-        <div class="hint">Start a study to read together in real time. Everyone stays in sync as the leader moves through a passage, and the group keeps going even if whoever started it drops off.</div>
-        <button class="dl" id="startStudyBtn" style="width:100%;margin-bottom:18px">Start a Study</button>
-        <div class="testament-label">Have a code?</div>
+        <div class="hint">${t("study_intro_hint")}</div>
+        <button class="dl" id="startStudyBtn" style="width:100%;margin-bottom:18px">${t("start_study")}</button>
+        <div class="testament-label">${t("have_code")}</div>
         <div style="display:flex;gap:8px;margin-bottom:18px">
-          <input id="joinCodeInput" class="code-input" type="text" placeholder="6-letter code" maxlength="6">
-          <button class="dl" id="joinStudyBtn">Join</button>
+          <input id="joinCodeInput" class="code-input" type="text" placeholder="${escapeHtml(t("code_placeholder"))}" maxlength="6">
+          <button class="dl" id="joinStudyBtn">${t("join")}</button>
         </div>
-        ${knownName ? `<div style="font-family:var(--font-ui);font-size:12.5px;color:var(--ink-faint);text-align:center">Your name: <strong style="color:var(--ink-soft)">${escapeHtml(knownName)}</strong> \u00b7 <button id="changeNameBtn" style="background:none;border:none;color:var(--cover);font-weight:600;padding:0">Change</button></div>` : ""}`;
+        ${knownName ? `<div style="font-family:var(--font-ui);font-size:12.5px;color:var(--ink-faint);text-align:center">${t("your_name")}: <strong style="color:var(--ink-soft)">${escapeHtml(knownName)}</strong> \u00b7 <button id="changeNameBtn" style="background:none;border:none;color:var(--cover);font-weight:600;padding:0">${t("change")}</button></div>` : ""}`;
       $("#startStudyBtn").addEventListener("click", startStudy);
       $("#joinStudyBtn").addEventListener("click", () => joinStudy($("#joinCodeInput").value));
       $("#joinCodeInput").addEventListener("keydown", (ev) => { if (ev.key === "Enter") joinStudy(ev.target.value); });
@@ -5397,36 +5634,36 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     const rosterList = [{ id: mesh.myId, name: mesh.myName, mine: true }]
       .concat(Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name, mine: false })));
     wrap.innerHTML = `
-      <div class="hint"><strong>Room code: ${mesh.roomCode}</strong><br>Share this link in your messaging app — anyone who opens it joins instantly.</div>
+      <div class="hint"><strong>${t("room_code")}: ${mesh.roomCode}</strong><br>${t("study_share_hint")}</div>
       <div style="display:flex;gap:8px;margin-bottom:18px">
-        <button class="dl" id="copyLinkBtn" style="flex:1">Copy link</button>
-        ${navigator.share ? '<button class="dl" id="shareLinkBtn" style="flex:1">Share…</button>' : ""}
+        <button class="dl" id="copyLinkBtn" style="flex:1">${t("copy_link")}</button>
+        ${navigator.share ? `<button class="dl" id="shareLinkBtn" style="flex:1">${t("share")}</button>` : ""}
       </div>
-      <div class="testament-label">In this study (${rosterList.length})</div>
+      <div class="testament-label">${t("study_in_this")} (${rosterList.length})</div>
       <div style="margin-bottom:16px">${rosterList.map((p) => `<div class="roster-row"${p.mine ? ' id="myRosterRow" style="cursor:pointer"' : ""}>
-        <span>${escapeHtml(p.name)}${p.mine ? " (you \u2014 tap to rename)" : ""}</span>${mesh.leaderId === p.id ? '<span class="roster-tag">LEADING</span>' : ""}
+        <span>${escapeHtml(p.name)}${p.mine ? t("study_you_tap_rename") : ""}</span>${mesh.leaderId === p.id ? `<span class="roster-tag">${t("study_leading_tag")}</span>` : ""}
       </div>`).join("")}</div>
       ${mesh.isLeader
-        ? `<div class="hint">You're leading — your navigation moves everyone who's following along.</div>`
-        : `<button class="dl" id="takeLeadBtn" style="width:100%;margin-bottom:10px">Take the lead</button>
-           <label class="follow-row"><input type="checkbox" id="followToggle" ${mesh.following ? "checked" : ""}> Follow along automatically</label>`}
-      <label class="follow-row"><input type="checkbox" id="shareMarkupToggle" ${mesh.shareMarkup ? "checked" : ""}> Share highlights &amp; notes with the group</label>
-      <div class="hint" style="margin-bottom:10px">Off by default. When on, highlights and notes you make from now on are sent to everyone else who also has this on — and theirs are saved to your copy. Leave it off to read along and mark up privately.</div>
-      ${mesh.shareMarkup ? `<button class="dl" id="pushMarkupBtn" style="width:100%;margin-bottom:16px">Send my existing marks for ${escapeHtml(state.book.name)} ${state.chapter}</button>` : ""}
-      <button class="leave-btn" id="leaveStudyBtn">Leave study</button>
+        ? `<div class="hint">${t("study_leading_hint")}</div>`
+        : `<button class="dl" id="takeLeadBtn" style="width:100%;margin-bottom:10px">${t("take_lead")}</button>
+           <label class="follow-row"><input type="checkbox" id="followToggle" ${mesh.following ? "checked" : ""}> ${t("follow_along")}</label>`}
+      <label class="follow-row"><input type="checkbox" id="shareMarkupToggle" ${mesh.shareMarkup ? "checked" : ""}> ${t("share_markup")}</label>
+      <div class="hint" style="margin-bottom:10px">${t("study_share_markup_hint")}</div>
+      ${mesh.shareMarkup ? `<button class="dl" id="pushMarkupBtn" style="width:100%;margin-bottom:16px">${t("study_send_marks_for")} ${escapeHtml(bookDisplayName(state.book))} ${state.chapter}</button>` : ""}
+      <button class="leave-btn" id="leaveStudyBtn">${t("leave_study")}</button>
     `;
     $("#myRosterRow").addEventListener("click", changeMyName);
     $("#copyLinkBtn").addEventListener("click", () => {
-      if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied"));
+      if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(() => toast(t("link_copied")));
     });
     $("#shareLinkBtn")?.addEventListener("click", () => {
-      navigator.share({ title: "Join our Bible study", url: shareUrl }).catch(() => {});
+      navigator.share({ title: t("study_share_title"), url: shareUrl }).catch(() => {});
     });
     $("#takeLeadBtn")?.addEventListener("click", takeLead);
     $("#followToggle")?.addEventListener("change", (ev) => { mesh.following = ev.target.checked; });
     $("#shareMarkupToggle").addEventListener("change", (ev) => {
       mesh.shareMarkup = ev.target.checked;
-      toast(mesh.shareMarkup ? "Sharing highlights & notes" : "Highlights & notes are private again");
+      toast(mesh.shareMarkup ? t("study_sharing_on") : t("study_sharing_off"));
       renderStudyView();
     });
     $("#pushMarkupBtn")?.addEventListener("click", async () => {
@@ -5550,6 +5787,8 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
   });
 
   $("#listenBtn").addEventListener("click", toggleReadAloud);
+  $("#readBody").addEventListener("touchstart", onReadTouchStart, { passive: true });
+  $("#readBody").addEventListener("touchend", onReadTouchEnd, { passive: true });
   $("#strongsModeBtn").addEventListener("click", () => {
     state.strongsMode = !state.strongsMode;
     $("#strongsModeBtn").classList.toggle("on", state.strongsMode);
@@ -5773,6 +6012,9 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
   $$("#journalModeToggle button").forEach((btn) => {
     btn.addEventListener("click", () => { state.journalMode = btn.dataset.jmode; renderJournalView(); });
   });
+  $$("#langToggle button").forEach((btn) => {
+    btn.addEventListener("click", () => setLanguage(btn.dataset.lang));
+  });
 
   /* =====================================================================
      Boot
@@ -5815,6 +6057,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     // getVoices() this early nudges that load to happen well before anyone
     // taps Listen, rather than exactly when it matters.
     if (speechSupported()) window.speechSynthesis.getVoices();
+    applyStaticLanguage();
     seedDefaultTabsIfEmpty();
     renderTabStrip();
     setView("read");
