@@ -778,9 +778,9 @@
       <div class="testament-label" style="margin-top:0">Language / Idioma</div>
       <div class="seg-toggle" id="langToggle">
         <button data-lang="en" type="button">English</button>
-        <button data-lang="es" type="button">Espa\u00f1ol</button>
+        <button data-lang="es" type="button">Español</button>
       </div>
-      <div class="hint">Translates the app itself \u2014 navigation, buttons, hints. Doesn't yet cover this guide or the apologetics essays, which stay in English for now.</div>
+      <div class="hint">Translates the app itself — navigation, buttons, hints. Doesn't yet cover this guide or the apologetics essays, which stay in English for now.</div>
 
       <div class="testament-label" style="margin-top:22px">How to use Berea</div>
       <div id="helpList"></div>
@@ -971,15 +971,15 @@
 <div id="outlineImportBackdrop" class="sheet-backdrop">
   <div class="sheet wide-sheet">
     <div class="sheet-ref">Import an outline</div>
-    <div class="sheet-text">Paste a topic ("Emmanuel: God With Us") or an existing outline you already have \u2014 from ChatGPT, Claude, notes, anywhere.</div>
-    <textarea id="outlineImportInput" class="ai-textarea" style="height:90px" placeholder="A topic, or an existing outline to convert\u2026"></textarea>
+    <div class="sheet-text">Paste a topic ("Emmanuel: God With Us") or an existing outline you already have — from ChatGPT, Claude, notes, anywhere.</div>
+    <textarea id="outlineImportInput" class="ai-textarea" style="height:90px" placeholder="A topic, or an existing outline to convert…"></textarea>
     <button class="dl" id="outlineBuildPromptBtn" style="width:100%;margin:8px 0 4px">Build prompt</button>
     <div id="outlineImportPasteWrap" style="display:none">
       <div class="sheet-text" style="margin-top:10px">Copy this into any AI chat:</div>
       <textarea id="outlineImportPrompt" class="ai-textarea" style="height:100px" readonly></textarea>
       <button class="dl" id="outlineCopyPromptBtn" style="width:100%;margin:8px 0 14px">Copy prompt</button>
       <div class="sheet-text" style="margin-bottom:6px">Paste the AI's JSON reply here:</div>
-      <textarea id="outlineImportPaste" class="ai-textarea" placeholder="Paste the JSON response\u2026"></textarea>
+      <textarea id="outlineImportPaste" class="ai-textarea" placeholder="Paste the JSON response…"></textarea>
       <button class="dl" id="outlineDoImportBtn" style="width:100%;margin-top:8px">Import</button>
     </div>
     <div class="sheet-text" id="outlineImportStatus" style="margin-top:10px"></div>
@@ -1070,72 +1070,72 @@
      Canonical book data
   ===================================================================== */
   const BOOKS = [
-    { name: "Genesis", nameEs: "Génesis", usfm: "GEN", file: "Genesis", chapters: 50, testament: "OT" },
-    { name: "Exodus", nameEs: "Éxodo", usfm: "EXO", file: "Exodus", chapters: 40, testament: "OT" },
-    { name: "Leviticus", nameEs: "Levítico", usfm: "LEV", file: "Leviticus", chapters: 27, testament: "OT" },
-    { name: "Numbers", nameEs: "Números", usfm: "NUM", file: "Numbers", chapters: 36, testament: "OT" },
-    { name: "Deuteronomy", nameEs: "Deuteronomio", usfm: "DEU", file: "Deuteronomy", chapters: 34, testament: "OT" },
-    { name: "Joshua", nameEs: "Josué", usfm: "JOS", file: "Joshua", chapters: 24, testament: "OT" },
-    { name: "Judges", nameEs: "Jueces", usfm: "JDG", file: "Judges", chapters: 21, testament: "OT" },
-    { name: "Ruth", nameEs: "Rut", usfm: "RUT", file: "Ruth", chapters: 4, testament: "OT" },
-    { name: "1 Samuel", nameEs: "1 Samuel", usfm: "1SA", file: "1Samuel", chapters: 31, testament: "OT" },
-    { name: "2 Samuel", nameEs: "2 Samuel", usfm: "2SA", file: "2Samuel", chapters: 24, testament: "OT" },
-    { name: "1 Kings", nameEs: "1 Reyes", usfm: "1KI", file: "1Kings", chapters: 22, testament: "OT" },
-    { name: "2 Kings", nameEs: "2 Reyes", usfm: "2KI", file: "2Kings", chapters: 25, testament: "OT" },
-    { name: "1 Chronicles", nameEs: "1 Crónicas", usfm: "1CH", file: "1Chronicles", chapters: 29, testament: "OT" },
-    { name: "2 Chronicles", nameEs: "2 Crónicas", usfm: "2CH", file: "2Chronicles", chapters: 36, testament: "OT" },
-    { name: "Ezra", nameEs: "Esdras", usfm: "EZR", file: "Ezra", chapters: 10, testament: "OT" },
-    { name: "Nehemiah", nameEs: "Nehemías", usfm: "NEH", file: "Nehemiah", chapters: 13, testament: "OT" },
-    { name: "Esther", nameEs: "Ester", usfm: "EST", file: "Esther", chapters: 10, testament: "OT" },
-    { name: "Job", nameEs: "Job", usfm: "JOB", file: "Job", chapters: 42, testament: "OT" },
-    { name: "Psalms", nameEs: "Salmos", usfm: "PSA", file: "Psalms", chapters: 150, testament: "OT" },
-    { name: "Proverbs", nameEs: "Proverbios", usfm: "PRO", file: "Proverbs", chapters: 31, testament: "OT" },
-    { name: "Ecclesiastes", nameEs: "Eclesiastés", usfm: "ECC", file: "Ecclesiastes", chapters: 12, testament: "OT" },
-    { name: "Song of Solomon", nameEs: "Cantares", usfm: "SNG", file: "SongofSolomon", chapters: 8, testament: "OT" },
-    { name: "Isaiah", nameEs: "Isaías", usfm: "ISA", file: "Isaiah", chapters: 66, testament: "OT" },
-    { name: "Jeremiah", nameEs: "Jeremías", usfm: "JER", file: "Jeremiah", chapters: 52, testament: "OT" },
-    { name: "Lamentations", nameEs: "Lamentaciones", usfm: "LAM", file: "Lamentations", chapters: 5, testament: "OT" },
-    { name: "Ezekiel", nameEs: "Ezequiel", usfm: "EZK", file: "Ezekiel", chapters: 48, testament: "OT" },
-    { name: "Daniel", nameEs: "Daniel", usfm: "DAN", file: "Daniel", chapters: 12, testament: "OT" },
-    { name: "Hosea", nameEs: "Oseas", usfm: "HOS", file: "Hosea", chapters: 14, testament: "OT" },
-    { name: "Joel", nameEs: "Joel", usfm: "JOL", file: "Joel", chapters: 3, testament: "OT" },
-    { name: "Amos", nameEs: "Amós", usfm: "AMO", file: "Amos", chapters: 9, testament: "OT" },
-    { name: "Obadiah", nameEs: "Abdías", usfm: "OBA", file: "Obadiah", chapters: 1, testament: "OT" },
-    { name: "Jonah", nameEs: "Jonás", usfm: "JON", file: "Jonah", chapters: 4, testament: "OT" },
-    { name: "Micah", nameEs: "Miqueas", usfm: "MIC", file: "Micah", chapters: 7, testament: "OT" },
-    { name: "Nahum", nameEs: "Nahúm", usfm: "NAM", file: "Nahum", chapters: 3, testament: "OT" },
-    { name: "Habakkuk", nameEs: "Habacuc", usfm: "HAB", file: "Habakkuk", chapters: 3, testament: "OT" },
-    { name: "Zephaniah", nameEs: "Sofonías", usfm: "ZEP", file: "Zephaniah", chapters: 3, testament: "OT" },
-    { name: "Haggai", nameEs: "Hageo", usfm: "HAG", file: "Haggai", chapters: 2, testament: "OT" },
-    { name: "Zechariah", nameEs: "Zacarías", usfm: "ZEC", file: "Zechariah", chapters: 14, testament: "OT" },
-    { name: "Malachi", nameEs: "Malaquías", usfm: "MAL", file: "Malachi", chapters: 4, testament: "OT" },
-    { name: "Matthew", nameEs: "Mateo", usfm: "MAT", file: "Matthew", chapters: 28, testament: "NT" },
-    { name: "Mark", nameEs: "Marcos", usfm: "MRK", file: "Mark", chapters: 16, testament: "NT" },
-    { name: "Luke", nameEs: "Lucas", usfm: "LUK", file: "Luke", chapters: 24, testament: "NT" },
-    { name: "John", nameEs: "Juan", usfm: "JHN", file: "John", chapters: 21, testament: "NT" },
-    { name: "Acts", nameEs: "Hechos", usfm: "ACT", file: "Acts", chapters: 28, testament: "NT" },
-    { name: "Romans", nameEs: "Romanos", usfm: "ROM", file: "Romans", chapters: 16, testament: "NT" },
-    { name: "1 Corinthians", nameEs: "1 Corintios", usfm: "1CO", file: "1Corinthians", chapters: 16, testament: "NT" },
-    { name: "2 Corinthians", nameEs: "2 Corintios", usfm: "2CO", file: "2Corinthians", chapters: 13, testament: "NT" },
-    { name: "Galatians", nameEs: "Gálatas", usfm: "GAL", file: "Galatians", chapters: 6, testament: "NT" },
-    { name: "Ephesians", nameEs: "Efesios", usfm: "EPH", file: "Ephesians", chapters: 6, testament: "NT" },
-    { name: "Philippians", nameEs: "Filipenses", usfm: "PHP", file: "Philippians", chapters: 4, testament: "NT" },
-    { name: "Colossians", nameEs: "Colosenses", usfm: "COL", file: "Colossians", chapters: 4, testament: "NT" },
-    { name: "1 Thessalonians", nameEs: "1 Tesalonicenses", usfm: "1TH", file: "1Thessalonians", chapters: 5, testament: "NT" },
-    { name: "2 Thessalonians", nameEs: "2 Tesalonicenses", usfm: "2TH", file: "2Thessalonians", chapters: 3, testament: "NT" },
-    { name: "1 Timothy", nameEs: "1 Timoteo", usfm: "1TI", file: "1Timothy", chapters: 6, testament: "NT" },
-    { name: "2 Timothy", nameEs: "2 Timoteo", usfm: "2TI", file: "2Timothy", chapters: 4, testament: "NT" },
-    { name: "Titus", nameEs: "Tito", usfm: "TIT", file: "Titus", chapters: 3, testament: "NT" },
-    { name: "Philemon", nameEs: "Filemón", usfm: "PHM", file: "Philemon", chapters: 1, testament: "NT" },
-    { name: "Hebrews", nameEs: "Hebreos", usfm: "HEB", file: "Hebrews", chapters: 13, testament: "NT" },
-    { name: "James", nameEs: "Santiago", usfm: "JAS", file: "James", chapters: 5, testament: "NT" },
-    { name: "1 Peter", nameEs: "1 Pedro", usfm: "1PE", file: "1Peter", chapters: 5, testament: "NT" },
-    { name: "2 Peter", nameEs: "2 Pedro", usfm: "2PE", file: "2Peter", chapters: 3, testament: "NT" },
-    { name: "1 John", nameEs: "1 Juan", usfm: "1JN", file: "1John", chapters: 5, testament: "NT" },
-    { name: "2 John", nameEs: "2 Juan", usfm: "2JN", file: "2John", chapters: 1, testament: "NT" },
-    { name: "3 John", nameEs: "3 Juan", usfm: "3JN", file: "3John", chapters: 1, testament: "NT" },
-    { name: "Jude", nameEs: "Judas", usfm: "JUD", file: "Jude", chapters: 1, testament: "NT" },
-    { name: "Revelation", nameEs: "Apocalipsis", usfm: "REV", file: "Revelation", chapters: 22, testament: "NT" },
+    { name: "Genesis", nameEs: "Génesis", fileEs: "Génesis", usfm: "GEN", file: "Genesis", chapters: 50, testament: "OT" },
+    { name: "Exodus", nameEs: "Éxodo", fileEs: "Éxodo", usfm: "EXO", file: "Exodus", chapters: 40, testament: "OT" },
+    { name: "Leviticus", nameEs: "Levítico", fileEs: "Levítico", usfm: "LEV", file: "Leviticus", chapters: 27, testament: "OT" },
+    { name: "Numbers", nameEs: "Números", fileEs: "Números", usfm: "NUM", file: "Numbers", chapters: 36, testament: "OT" },
+    { name: "Deuteronomy", nameEs: "Deuteronomio", fileEs: "Deuteronomio", usfm: "DEU", file: "Deuteronomy", chapters: 34, testament: "OT" },
+    { name: "Joshua", nameEs: "Josué", fileEs: "Josué", usfm: "JOS", file: "Joshua", chapters: 24, testament: "OT" },
+    { name: "Judges", nameEs: "Jueces", fileEs: "Jueces", usfm: "JDG", file: "Judges", chapters: 21, testament: "OT" },
+    { name: "Ruth", nameEs: "Rut", fileEs: "Rut", usfm: "RUT", file: "Ruth", chapters: 4, testament: "OT" },
+    { name: "1 Samuel", nameEs: "1 Samuel", fileEs: "1 Samuel", usfm: "1SA", file: "1Samuel", chapters: 31, testament: "OT" },
+    { name: "2 Samuel", nameEs: "2 Samuel", fileEs: "2 Samuel", usfm: "2SA", file: "2Samuel", chapters: 24, testament: "OT" },
+    { name: "1 Kings", nameEs: "1 Reyes", fileEs: "1 Reyes", usfm: "1KI", file: "1Kings", chapters: 22, testament: "OT" },
+    { name: "2 Kings", nameEs: "2 Reyes", fileEs: "2 Reyes", usfm: "2KI", file: "2Kings", chapters: 25, testament: "OT" },
+    { name: "1 Chronicles", nameEs: "1 Crónicas", fileEs: "1 Crónicas", usfm: "1CH", file: "1Chronicles", chapters: 29, testament: "OT" },
+    { name: "2 Chronicles", nameEs: "2 Crónicas", fileEs: "2 Crónicas", usfm: "2CH", file: "2Chronicles", chapters: 36, testament: "OT" },
+    { name: "Ezra", nameEs: "Esdras", fileEs: "Ésdras", usfm: "EZR", file: "Ezra", chapters: 10, testament: "OT" },
+    { name: "Nehemiah", nameEs: "Nehemías", fileEs: "Nehemías", usfm: "NEH", file: "Nehemiah", chapters: 13, testament: "OT" },
+    { name: "Esther", nameEs: "Ester", fileEs: "Ester", usfm: "EST", file: "Esther", chapters: 10, testament: "OT" },
+    { name: "Job", nameEs: "Job", fileEs: "Job", usfm: "JOB", file: "Job", chapters: 42, testament: "OT" },
+    { name: "Psalms", nameEs: "Salmos", fileEs: "Salmos", usfm: "PSA", file: "Psalms", chapters: 150, testament: "OT" },
+    { name: "Proverbs", nameEs: "Proverbios", fileEs: "Proverbios", usfm: "PRO", file: "Proverbs", chapters: 31, testament: "OT" },
+    { name: "Ecclesiastes", nameEs: "Eclesiastés", fileEs: "Eclesiástes", usfm: "ECC", file: "Ecclesiastes", chapters: 12, testament: "OT" },
+    { name: "Song of Solomon", nameEs: "Cantares", fileEs: "Cantares", usfm: "SNG", file: "SongofSolomon", chapters: 8, testament: "OT" },
+    { name: "Isaiah", nameEs: "Isaías", fileEs: "Isaías", usfm: "ISA", file: "Isaiah", chapters: 66, testament: "OT" },
+    { name: "Jeremiah", nameEs: "Jeremías", fileEs: "Jeremías", usfm: "JER", file: "Jeremiah", chapters: 52, testament: "OT" },
+    { name: "Lamentations", nameEs: "Lamentaciones", fileEs: "Lamentaciones", usfm: "LAM", file: "Lamentations", chapters: 5, testament: "OT" },
+    { name: "Ezekiel", nameEs: "Ezequiel", fileEs: "Ezequiel", usfm: "EZK", file: "Ezekiel", chapters: 48, testament: "OT" },
+    { name: "Daniel", nameEs: "Daniel", fileEs: "Daniel", usfm: "DAN", file: "Daniel", chapters: 12, testament: "OT" },
+    { name: "Hosea", nameEs: "Oseas", fileEs: "Oséas", usfm: "HOS", file: "Hosea", chapters: 14, testament: "OT" },
+    { name: "Joel", nameEs: "Joel", fileEs: "Joel", usfm: "JOL", file: "Joel", chapters: 3, testament: "OT" },
+    { name: "Amos", nameEs: "Amós", fileEs: "Amós", usfm: "AMO", file: "Amos", chapters: 9, testament: "OT" },
+    { name: "Obadiah", nameEs: "Abdías", fileEs: "Abdías", usfm: "OBA", file: "Obadiah", chapters: 1, testament: "OT" },
+    { name: "Jonah", nameEs: "Jonás", fileEs: "Jonás", usfm: "JON", file: "Jonah", chapters: 4, testament: "OT" },
+    { name: "Micah", nameEs: "Miqueas", fileEs: "Miquéas", usfm: "MIC", file: "Micah", chapters: 7, testament: "OT" },
+    { name: "Nahum", nameEs: "Nahúm", fileEs: "Nahum", usfm: "NAM", file: "Nahum", chapters: 3, testament: "OT" },
+    { name: "Habakkuk", nameEs: "Habacuc", fileEs: "Habacuc", usfm: "HAB", file: "Habakkuk", chapters: 3, testament: "OT" },
+    { name: "Zephaniah", nameEs: "Sofonías", fileEs: "Sofonías", usfm: "ZEP", file: "Zephaniah", chapters: 3, testament: "OT" },
+    { name: "Haggai", nameEs: "Hageo", fileEs: "Aggeo", usfm: "HAG", file: "Haggai", chapters: 2, testament: "OT" },
+    { name: "Zechariah", nameEs: "Zacarías", fileEs: "Zacarías", usfm: "ZEC", file: "Zechariah", chapters: 14, testament: "OT" },
+    { name: "Malachi", nameEs: "Malaquías", fileEs: "Malaquías", usfm: "MAL", file: "Malachi", chapters: 4, testament: "OT" },
+    { name: "Matthew", nameEs: "Mateo", fileEs: "San Mateo", usfm: "MAT", file: "Matthew", chapters: 28, testament: "NT" },
+    { name: "Mark", nameEs: "Marcos", fileEs: "San Márcos", usfm: "MRK", file: "Mark", chapters: 16, testament: "NT" },
+    { name: "Luke", nameEs: "Lucas", fileEs: "San Lúcas", usfm: "LUK", file: "Luke", chapters: 24, testament: "NT" },
+    { name: "John", nameEs: "Juan", fileEs: "San Juan", usfm: "JHN", file: "John", chapters: 21, testament: "NT" },
+    { name: "Acts", nameEs: "Hechos", fileEs: "Los Actos", usfm: "ACT", file: "Acts", chapters: 28, testament: "NT" },
+    { name: "Romans", nameEs: "Romanos", fileEs: "Romanos", usfm: "ROM", file: "Romans", chapters: 16, testament: "NT" },
+    { name: "1 Corinthians", nameEs: "1 Corintios", fileEs: "1 Corintios", usfm: "1CO", file: "1Corinthians", chapters: 16, testament: "NT" },
+    { name: "2 Corinthians", nameEs: "2 Corintios", fileEs: "2 Corintios", usfm: "2CO", file: "2Corinthians", chapters: 13, testament: "NT" },
+    { name: "Galatians", nameEs: "Gálatas", fileEs: "Gálatas", usfm: "GAL", file: "Galatians", chapters: 6, testament: "NT" },
+    { name: "Ephesians", nameEs: "Efesios", fileEs: "Efesios", usfm: "EPH", file: "Ephesians", chapters: 6, testament: "NT" },
+    { name: "Philippians", nameEs: "Filipenses", fileEs: "Filipenses", usfm: "PHP", file: "Philippians", chapters: 4, testament: "NT" },
+    { name: "Colossians", nameEs: "Colosenses", fileEs: "Colosenses", usfm: "COL", file: "Colossians", chapters: 4, testament: "NT" },
+    { name: "1 Thessalonians", nameEs: "1 Tesalonicenses", fileEs: "1 Tesalonicenses", usfm: "1TH", file: "1Thessalonians", chapters: 5, testament: "NT" },
+    { name: "2 Thessalonians", nameEs: "2 Tesalonicenses", fileEs: "2 Tesalonicenses", usfm: "2TH", file: "2Thessalonians", chapters: 3, testament: "NT" },
+    { name: "1 Timothy", nameEs: "1 Timoteo", fileEs: "1 Timoteo", usfm: "1TI", file: "1Timothy", chapters: 6, testament: "NT" },
+    { name: "2 Timothy", nameEs: "2 Timoteo", fileEs: "2 Timoteo", usfm: "2TI", file: "2Timothy", chapters: 4, testament: "NT" },
+    { name: "Titus", nameEs: "Tito", fileEs: "Tito", usfm: "TIT", file: "Titus", chapters: 3, testament: "NT" },
+    { name: "Philemon", nameEs: "Filemón", fileEs: "Filemón", usfm: "PHM", file: "Philemon", chapters: 1, testament: "NT" },
+    { name: "Hebrews", nameEs: "Hebreos", fileEs: "Hebreos", usfm: "HEB", file: "Hebrews", chapters: 13, testament: "NT" },
+    { name: "James", nameEs: "Santiago", fileEs: "Santiago", usfm: "JAS", file: "James", chapters: 5, testament: "NT" },
+    { name: "1 Peter", nameEs: "1 Pedro", fileEs: "1 San Pedro", usfm: "1PE", file: "1Peter", chapters: 5, testament: "NT" },
+    { name: "2 Peter", nameEs: "2 Pedro", fileEs: "2 San Pedro", usfm: "2PE", file: "2Peter", chapters: 3, testament: "NT" },
+    { name: "1 John", nameEs: "1 Juan", fileEs: "1 San Juan", usfm: "1JN", file: "1John", chapters: 5, testament: "NT" },
+    { name: "2 John", nameEs: "2 Juan", fileEs: "2 San Juan", usfm: "2JN", file: "2John", chapters: 1, testament: "NT" },
+    { name: "3 John", nameEs: "3 Juan", fileEs: "3 San Juan", usfm: "3JN", file: "3John", chapters: 1, testament: "NT" },
+    { name: "Jude", nameEs: "Judas", fileEs: "San Júdas", usfm: "JUD", file: "Jude", chapters: 1, testament: "NT" },
+    { name: "Revelation", nameEs: "Apocalipsis", fileEs: "Revelación", usfm: "REV", file: "Revelation", chapters: 22, testament: "NT" },
   ];
   function bookByName(name) { return BOOKS.find((b) => b.name === name) || null; }
   // Book names stay in English internally throughout -- aliases, tab refs,
@@ -1242,8 +1242,17 @@
     // (bible-api.com doesn't carry a Spanish translation as of this writing),
     // so this one only works once downloaded -- see the apiId-less guard in
     // fetchLiveChapter.
+    //
+    // Filenames in this repo are the Spanish book names (e.g. "San Juan.json",
+    // "G\u00e9nesis.json"), not the English ones aruljohn's other repos use --
+    // confirmed against the actual repo file listing, not assumed. That's
+    // `fileEs`, not `file` (which stays the English name shared by KJV/WEB).
+    // encodeURIComponent is required here and wasn't for the English repos:
+    // these filenames contain spaces and accented characters that need
+    // percent-encoding to survive as a URL (raw.githubusercontent.com serves
+    // "San%20Juan.json", not a literal space).
     RV1909: { id: "RV1909", name: "Reina-Valera 1909", bulk: true,
-      bookUrl: (b) => `https://raw.githubusercontent.com/aruljohn/Reina-Valera/master/${b.file}.json` },
+      bookUrl: (b) => `https://raw.githubusercontent.com/aruljohn/Reina-Valera/master/${encodeURIComponent(b.fileEs)}.json` },
   };
   const TR_ORDER = ["KJV", "WEB", "ASV", "BBE", "DARBY", "YLT", "RV1909"];
 
