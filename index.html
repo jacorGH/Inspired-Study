@@ -180,7 +180,13 @@
   }
   .view { display: none; }
   .view.active { display: block; animation: fadeIn 0.18s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  /* Opacity-only on purpose -- a transform here (even from a completed
+     animation) is a well-documented WebKit quirk that changes the
+     containing block for any position:sticky descendant, so a sticky
+     child (the Read view's pinned header) sticks relative to THIS
+     element instead of the actual scrolling container, leaving a gap
+     at the true top where scrolled content stays partly visible. */
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
   .hint {
     font-family: var(--font-ui);
@@ -298,10 +304,10 @@
   }
   .topic-ref:active { background: var(--gilt-soft); }
   .notemark {
-    font-size: 10px;
+    font-size: 12px;
     color: var(--cover);
     vertical-align: super;
-    margin-left: 2px;
+    margin: 0 3px 0 2px;
   }
   .hl-yellow { background: var(--hl-yellow); }
   .hl-green  { background: var(--hl-green); }
@@ -394,6 +400,17 @@
     font-weight: 600;
     margin: 0 0 8px;
     color: var(--ink);
+  }
+  .page-title-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px;
+  }
+  .page-title-link {
+    font-family: var(--font-display); font-size: 15px; font-weight: 600;
+    color: var(--cover); background: none; border: none; padding: 2px 0; text-align: left;
+  }
+  .page-title-row .remove-x {
+    flex: 0 0 auto; color: var(--ink-faint); font-size: 17px; line-height: 1;
+    background: none; border: none; padding: 2px 6px;
   }
   .page-loading { color: var(--ink-faint); font-family: var(--font-ui); font-size: 13px; }
 
@@ -2383,7 +2400,7 @@
     } else {
       body = escapeHtml(row.text);
     }
-    return `<span class="${cls.join(" ")}" data-book="${escapeHtml(row.book)}" data-chapter="${row.chapter}" data-verse="${row.verse}"><sup class="vnum">${row.verse}</sup>${body}${marker} </span>`;
+    return `<span class="${cls.join(" ")}" data-book="${escapeHtml(row.book)}" data-chapter="${row.chapter}" data-verse="${row.verse}"><sup class="vnum">${row.verse}</sup>${marker}${body} </span>`;
   }
 
   /* ---- Read view ---- */
@@ -2588,12 +2605,15 @@
     const stacked = tab.refs.length > 2;
     $("#tabViewHead").innerHTML = `
       <h1 class="chapter-title" style="margin-bottom:4px">${escapeHtml(tab.label)}</h1>
-      <div class="hint" style="margin-bottom:12px">Reading in <strong>${tab.translationId}</strong> — ${tab.refs.length} passages${stacked ? "" : ", side by side"}.</div>`;
+      <div class="hint" style="margin-bottom:12px">Reading in <strong>${tab.translationId}</strong> — ${tab.refs.length} passages${stacked ? "" : ", side by side"}. Tap a reference to read it in full; \u00d7 removes it from this tab.</div>`;
     const spread = $("#tabSpread");
     spread.classList.toggle("stacked", stacked);
     spread.innerHTML = tab.refs.map((r, i) => `
       <div class="page">
-        <div class="page-title">${refLabel(r.book, r.chapter, r.verseStart, r.verseEnd)}</div>
+        <div class="page-title-row">
+          <button class="page-title-link" data-jump="${i}">${refLabel(r.book, r.chapter, r.verseStart, r.verseEnd)}</button>
+          <button class="remove-x" data-remove="${i}" title="Remove this passage from the tab">\u00d7</button>
+        </div>
         <div class="verseflow" data-idx="${i}"><span class="page-loading">Loading…</span></div>
       </div>`).join("");
 
@@ -2619,19 +2639,51 @@
       }
     }
 
+    spread.querySelectorAll("[data-jump]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const r = tab.refs[parseInt(btn.dataset.jump, 10)];
+        const book = bookByName(r.book);
+        if (!book) return;
+        state.book = book;
+        state.chapter = r.chapter;
+        state.verseFocus = r.verseStart || null;
+        state.readTr = tab.translationId; // read in the same translation the tab is using
+        setReturnContext({ mode: null, sheet: "tab", payload: tab.id, label: tab.label });
+        setView("read");
+        $$("#bottomnav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "read"));
+      });
+    });
+    spread.querySelectorAll("[data-remove]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (tab.refs.length <= 1) {
+          toast("A tab needs at least one passage — remove the whole tab from the strip instead.");
+          return;
+        }
+        const idx = parseInt(btn.dataset.remove, 10);
+        const tabsList = loadTabs();
+        const liveTab = tabsList.find((x) => x.id === tab.id);
+        if (!liveTab) return;
+        liveTab.refs.splice(idx, 1);
+        saveTabs(tabsList);
+        broadcastTabUpdate(liveTab.id, liveTab.refs);
+        renderTabView(liveTab);
+      });
+    });
+
     $("#tabAddRow").innerHTML = `<button class="sheet-actions button" id="addPassageBtn" style="width:100%;margin-top:4px;font-family:var(--font-ui);font-weight:600;padding:11px;border-radius:9px;border:1px dashed var(--gilt-soft);background:var(--panel);color:var(--cover)">+ Add a cross-reference passage</button>`;
     $("#addPassageBtn").addEventListener("click", () => {
       const raw = prompt('Add a reference (e.g. "Romans 8:38-39")');
       if (!raw) return;
       const parsed = parseReference(raw);
       if (!parsed) { toast("Couldn't understand that reference."); return; }
-      const tabs = loadTabs();
-      const t = tabs.find((x) => x.id === tab.id);
-      t.refs.push({ book: parsed.book.name, chapter: parsed.chapter,
+      const tabsList = loadTabs();
+      const liveTab = tabsList.find((x) => x.id === tab.id);
+      liveTab.refs.push({ book: parsed.book.name, chapter: parsed.chapter,
         verseStart: parsed.verseStart, verseEnd: parsed.verseEnd });
-      saveTabs(tabs);
-      broadcastTabUpdate(t.id, t.refs);
-      renderTabView(t);
+      saveTabs(tabsList);
+      broadcastTabUpdate(liveTab.id, liveTab.refs);
+      renderTabView(liveTab);
     });
   }
 
@@ -2762,6 +2814,12 @@
     if (ctx.sheet === "xref" && ctx.payload) {
       // Cross-refs were opened from a verse, so stay in the reader.
       openXrefSheet(ctx.payload.book, ctx.payload.chapter, ctx.payload.verse);
+      return;
+    }
+    if (ctx.sheet === "tab" && ctx.payload) {
+      // Reached from a tab's own passage list, not from Search -- reopen
+      // that tab directly rather than routing through Search at all.
+      openTab(ctx.payload);
       return;
     }
     setView("search");
