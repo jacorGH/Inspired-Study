@@ -2273,6 +2273,7 @@
       study_send_marks_for: "Send my existing marks for",
       study_sharing_on: "Sharing highlights & notes", study_sharing_off: "Highlights & notes are private again",
       study_share_title: "Join our Bible study",
+      study_reconnecting: "Connection interrupted \u2014 reconnecting\u2026",
     },
     es: {
       app_name: "Berea",
@@ -2314,6 +2315,7 @@
       study_send_marks_for: "Enviar mis marcas actuales de",
       study_sharing_on: "Compartiendo resaltados y notas", study_sharing_off: "Resaltados y notas vuelven a ser privados",
       study_share_title: "\u00danete a nuestro estudio b\u00edblico",
+      study_reconnecting: "Conexi\u00f3n interrumpida \u2014 reconectando\u2026",
     },
   };
 
@@ -5064,7 +5066,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       <p><strong>Sharing marks</strong> is off by default. Switch it on and your highlights and notes go to everyone else who also has it on, and theirs come to you. Leave it off to mark up privately. If you turn it on mid-study, <em>Send my existing marks</em> catches the group up on the current chapter.</p>
       <p><strong>Sharing an outline</strong> — open it under Journal › Outlines while in a session and tap <em>Share with study group</em>; it appears in everyone's own Outlines list. Sharing again after further edits updates their copy.</p>
       <p>Once it's shared, the <strong>leader</strong> gets a presenting bar (▶ Start presenting, then ‹ Prev / Next ›) at the top of that outline. Stepping through it highlights the current block and moves everyone whose <em>Follow along</em> is switched on straight to it — the same toggle that follows Bible chapters already uses, so one switch covers both.</p>
-      <p>Everyone connects directly to everyone else, so the session keeps going even if the person who started it closes their tab. Reopening the same link rejoins.</p>
+      <p>Everyone connects directly to everyone else, so the session keeps going even if the person who started it closes their tab. Reopening the same link rejoins. A dropped connection also recovers on its own — a brief blip reconnects quietly, and if that doesn't work in time, the app rejoins fresh using the room code, which finds whoever's currently leading even if that changed while you were gone.</p>
       <p>When you leave, if the group covered any ground, you'll get a <strong>recap</strong> \u2014 passages visited and tabs pinned during the session, ready to copy and share. It's yours alone; each person's recap reflects what they had open, and it's never sent to anyone automatically.</p>` },
 
     { id: "h-journal", title: "Journal \u2014 prayer and your own work", body: `
@@ -5224,7 +5226,23 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     pendingAutoJoinCode: null, // set when a #study= link opened but a name
                                // is needed before joining can safely start
     joinStatus: null,          // user-visible progress while connecting
+    reconnecting: false,       // true while automatic recovery is in progress
+    reconnectAttempts: 0,      // attempts made against the current outage
   };
+
+  // Destroying a peer ourselves (as part of OUR OWN reconnection logic, or
+  // when the user deliberately leaves) fires that same peer's 'close' event
+  // -- the exact event the reconnection logic below listens for to detect
+  // an UNEXPECTED loss. Without this guard, our own intentional teardown
+  // would trigger another round of "recover from this," looping into
+  // itself. Every deliberate peer.destroy() in this file goes through here.
+  let intentionalPeerTeardown = false;
+  function destroyPeerQuietly(peer) {
+    if (!peer) return;
+    intentionalPeerTeardown = true;
+    try { peer.destroy(); } catch (e) {}
+    setTimeout(() => { intentionalPeerTeardown = false; }, 0);
+  }
 
   /* ---------------------------------------------------------------------
      Session recap
@@ -5326,14 +5344,48 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     renderStudyView();
   }
 
+  const PEER_RETRY_DELAYS = [1500, 4000, 8000]; // ms between attempts to reconnect to one specific dropped peer
+  const reconnectingPeers = new Map(); // peerId -> attempts made so far, this outage
+
   function meshRemoveConnection(id) {
     if (!mesh.connections.has(id)) return;
     mesh.connections.delete(id);
-    mesh.roster.delete(id);
     renderStudyView();
-    if (mesh.active && !mesh.isHost && id === hostPeerId(mesh.roomCode)) {
-      maybeReclaimHost();
+    if (!mesh.active) { mesh.roster.delete(id); return; }
+    // Try to recover the connection before giving up on this participant --
+    // this is exactly the "temporarily lost connection" case, and should
+    // resolve itself quietly if the drop was brief, without immediately
+    // erasing them from the roster or (if this was the host) triggering a
+    // host election over what might be a two-second WiFi hiccup.
+    retryPeerConnection(id);
+  }
+
+  function retryPeerConnection(id) {
+    const known = mesh.roster.get(id);
+    const name = known ? known.name : null;
+    const attempt = reconnectingPeers.get(id) || 0;
+    if (attempt >= PEER_RETRY_DELAYS.length) {
+      reconnectingPeers.delete(id);
+      mesh.roster.delete(id);
+      renderStudyView();
+      if (mesh.active && !mesh.isHost && id === hostPeerId(mesh.roomCode)) maybeReclaimHost();
+      return;
     }
+    reconnectingPeers.set(id, attempt + 1);
+    setTimeout(() => {
+      if (!mesh.active || !mesh.peer) { reconnectingPeers.delete(id); return; }
+      if (mesh.connections.has(id)) { reconnectingPeers.delete(id); return; } // recovered some other way already
+      // Reuses connectToPeer's own "lower id connects" ordering rule, so
+      // this doesn't fight a simultaneous reconnect attempt from their
+      // side -- it's a no-op here exactly when it should be, deferring to
+      // them, and the outcome is checked below regardless of which side
+      // actually opened the channel.
+      connectToPeer(id, name);
+      setTimeout(() => {
+        if (mesh.connections.has(id)) { reconnectingPeers.delete(id); return; }
+        retryPeerConnection(id);
+      }, 1200);
+    }, PEER_RETRY_DELAYS[attempt]);
   }
 
   function connectToPeer(id, name) {
@@ -5493,7 +5545,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
       newPeer.on("open", (id) => {
         mesh.peer = newPeer; mesh.myId = id; mesh.isHost = true;
         wirePeerEvents();
-        if (oldPeer) oldPeer.destroy();
+        if (oldPeer) destroyPeerQuietly(oldPeer);
         mesh.connections.clear();
         knownPeers.forEach((p) => connectToPeer(p.id, p.name));
         renderStudyView();
@@ -5515,13 +5567,135 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     });
   }
 
+  /* =====================================================================
+     Automatic reconnection
+     ---------------------------------------------------------------------
+     Three tiers, mildest failure to most severe, each falling through to
+     the next if it doesn't recover in time:
+
+     1. Broker disconnected (lost the signaling link, e.g. a brief WiFi
+        blip) -- PeerJS's own peer.reconnect() can usually restore the SAME
+        peer id with no visible interruption. Retried with backoff rather
+        than the single attempt this used to make.
+     2. That still hasn't recovered after a few tries -- the underlying
+        Peer object may be unusable now. Fall back to a completely fresh
+        rejoin using the saved room code, which finds whoever is CURRENTLY
+        hosting even if host migration happened while we were disconnected
+        (the host's peer id is always derived from the room code, never
+        random) -- so this handles "someone else took over while I was
+        gone" for free, without any special-case logic for it.
+     3. That fresh rejoin gets no answer at all -- nobody is reachable at
+        the known host id. If we were the host ourselves and simply
+        haven't been replaced yet (nobody else had reason to reclaim it),
+        reclaim the host identity rather than leaving the group with
+        nowhere to reconnect to.
+
+     None of this needs the room code to be treated as a secret to guard --
+     it's already exactly what lets someone rejoin at all, by design (the
+     same code that's shown on screen and put in the share link).
+  ===================================================================== */
+  const RECONNECT_DELAYS = [1000, 3000, 6000, 12000]; // ms between broker-reconnect attempts
+
   function wirePeerEvents() {
     mesh.peer.on("connection", (conn) => { conn.on("open", () => meshAddConnection(conn)); });
     mesh.peer.on("disconnected", () => {
-      setTimeout(() => { if (mesh.active && mesh.peer && mesh.peer.disconnected) mesh.peer.reconnect(); }, 2000);
+      if (!mesh.active || intentionalPeerTeardown) return;
+      scheduleBrokerReconnect();
     });
-    mesh.peer.on("close", () => { mesh.active = false; renderStudyView(); });
+    mesh.peer.on("close", () => {
+      if (intentionalPeerTeardown) return;
+      if (mesh.active) scheduleFullRejoin(mesh.isHost);
+      else renderStudyView();
+    });
     mesh.peer.on("error", (err) => console.warn("Study session peer error:", err));
+  }
+
+  function scheduleBrokerReconnect() {
+    if (mesh.reconnecting) return; // already retrying -- don't stack another loop
+    mesh.reconnecting = true;
+    mesh.reconnectAttempts = 0;
+    attemptBrokerReconnect(mesh.isHost);
+  }
+
+  function attemptBrokerReconnect(wasHost) {
+    if (!mesh.active || !mesh.peer) { mesh.reconnecting = false; return; }
+    if (!mesh.peer.disconnected) { finishBrokerReconnect(true, wasHost); return; }
+    if (mesh.reconnectAttempts >= RECONNECT_DELAYS.length) { finishBrokerReconnect(false, wasHost); return; }
+    const delay = RECONNECT_DELAYS[mesh.reconnectAttempts];
+    mesh.reconnectAttempts++;
+    renderStudyView(); // shows the "Reconnecting..." status
+    setTimeout(() => {
+      if (!mesh.active || !mesh.peer) { mesh.reconnecting = false; return; }
+      try { mesh.peer.reconnect(); } catch (e) {}
+      // reconnect() is async; give it a moment before checking whether it
+      // actually landed, rather than trusting it succeeded immediately.
+      setTimeout(() => attemptBrokerReconnect(wasHost), 1200);
+    }, delay);
+  }
+
+  function finishBrokerReconnect(success, wasHost) {
+    mesh.reconnecting = false;
+    mesh.reconnectAttempts = 0;
+    if (success) {
+      toast("Reconnected");
+      // The signaling link is back, but individual data connections to
+      // peers may still be stale even though the broker recovered --
+      // re-establish any that are missing.
+      Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name })).forEach((p) => {
+        if (!mesh.connections.has(p.id)) connectToPeer(p.id, p.name);
+      });
+      renderStudyView();
+    } else {
+      scheduleFullRejoin(wasHost);
+    }
+  }
+
+  function scheduleFullRejoin(wasHost) {
+    if (!mesh.roomCode) return; // nothing to rejoin -- never really in a room
+    const code = mesh.roomCode;
+    destroyPeerQuietly(mesh.peer);
+    mesh.active = false;
+    mesh.connections.clear();
+    // Roster is deliberately left alone here -- if the rejoin lands
+    // quickly, the same names simply reappearing reads as "we recovered,"
+    // not as the roster having emptied out and refilled.
+    joinStudy(code, {
+      silent: true,
+      isReconnect: true,
+      watchdogMs: 8000,
+      onReconnected: () => toast("Back in the study"),
+      onNoResponse: () => {
+        if (wasHost) {
+          reclaimHostRole(code);
+        } else {
+          toast("Couldn't find the study — it may have ended.");
+          mesh.active = false;
+          mesh.roster.clear();
+          renderStudyView();
+        }
+      },
+    });
+  }
+
+  async function reclaimHostRole(code) {
+    const name = getMyName();
+    try {
+      const { peer, id } = await initPeer(hostPeerId(code));
+      mesh.peer = peer; mesh.myId = id; mesh.isHost = true; mesh.active = true;
+      mesh.myName = name; mesh.roomCode = code;
+      mesh.leaderId = id; mesh.isLeader = true; mesh.following = true;
+      wirePeerEvents();
+      toast("Reconnected as host");
+      renderStudyView();
+    } catch (e) {
+      // Most likely: someone else claimed the host id in the meantime
+      // (a legitimate outcome, not a bug) -- nothing left to reconnect to
+      // as host, and a plain rejoin already failed to reach them either.
+      toast("Couldn't reconnect to the study — try rejoining with the code.");
+      mesh.active = false;
+      mesh.roster.clear();
+      renderStudyView();
+    }
   }
 
   async function startStudy() {
@@ -5543,17 +5717,21 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     }
   }
 
-  async function joinStudy(codeRaw) {
-    if (typeof Peer === "undefined") { toast("Study sessions need an internet connection."); return; }
+  async function joinStudy(codeRaw, opts) {
+    opts = opts || {};
+    if (typeof Peer === "undefined") { if (!opts.silent) toast("Study sessions need an internet connection."); return; }
     const code = (codeRaw || "").trim().toUpperCase();
-    if (code.length < 4) { toast("Enter the study's 6-letter code."); return; }
+    if (code.length < 4) { if (!opts.silent) toast("Enter the study's 6-letter code."); return; }
     const name = getMyName();
     mesh.roomCode = code; mesh.myName = name;
     // Visible immediately, before the (possibly slow) broker round trip --
     // so a guest opening a link always sees SOMETHING happen rather than a
-    // blank screen while this resolves.
-    mesh.joinStatus = `Joining ${code}\u2026`;
-    renderStudyView();
+    // blank screen while this resolves. Suppressed for a silent (automatic
+    // reconnection) attempt, which has its own "Reconnecting..." status.
+    if (!opts.silent) {
+      mesh.joinStatus = `Joining ${code}\u2026`;
+      renderStudyView();
+    }
     try {
       const { peer, id } = await initPeer(undefined);
       mesh.peer = peer; mesh.myId = id; mesh.isHost = false; mesh.active = true; mesh.following = true;
@@ -5567,24 +5745,32 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
         responded = true;
         meshAddConnection(conn);
         conn.send({ t: "hello", id: mesh.myId, name: mesh.myName });
+        if (opts.onReconnected) opts.onReconnected();
       });
-      conn.on("error", () => { if (!responded) toast("Couldn't find that study — check the code and try again."); });
+      conn.on("error", () => {
+        if (responded) return;
+        if (opts.silent) return; // the watchdog below covers this path instead
+        toast("Couldn't find that study — check the code and try again.");
+      });
       // If the handshake with the host never completes, say so plainly
       // instead of leaving an empty roster with no explanation -- a silent
       // stall here is exactly what "nothing on the guest's screen" looks
-      // like from the outside.
+      // like from the outside. A reconnection attempt gets its own
+      // callback here instead of the plain toast, so it can fall through
+      // to reclaiming the host role when that's the right next step.
       setTimeout(() => {
         if (mesh.active && mesh.roomCode === code && mesh.connections.size === 0) {
-          toast("Still trying to reach the study — check both devices have a connection.");
+          if (opts.onNoResponse) opts.onNoResponse();
+          else toast("Still trying to reach the study — check both devices have a connection.");
         }
-      }, 12000);
+      }, opts.watchdogMs || 12000);
       location.hash = "study=" + code;
-      sessionLogStart();
+      if (!opts.isReconnect) sessionLogStart(); // a reconnect shouldn't erase the recap-in-progress
       renderStudyView();
     } catch (e) {
       mesh.joinStatus = null;
-      toast("Couldn't join the study — check your connection and try again.");
-      renderStudyView();
+      if (!opts.silent) toast("Couldn't join the study — check your connection and try again.");
+      else if (opts.onNoResponse) opts.onNoResponse();
     }
   }
 
@@ -5596,12 +5782,14 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     const recap = (sessionLog.startedAt && (hasContent || elapsedMs > 30000)) ? buildSessionRecap() : null;
 
     mesh.connections.forEach((conn) => { try { conn.close(); } catch (e) {} });
-    if (mesh.peer) { try { mesh.peer.destroy(); } catch (e) {} }
+    if (mesh.peer) destroyPeerQuietly(mesh.peer);
     mesh.active = false; mesh.roomCode = null; mesh.peer = null;
     mesh.connections.clear(); mesh.roster.clear();
     mesh.leaderId = null; mesh.isLeader = false; mesh.isHost = false;
     mesh.shareMarkup = false; // never carries over into the next session
     mesh.pendingAutoJoinCode = null; mesh.joinStatus = null;
+    mesh.reconnecting = false; mesh.reconnectAttempts = 0; // leaving on purpose is not an outage to recover from
+    reconnectingPeers.clear();
     outlinePresentBlockId = null; // presentation only makes sense mid-session
     sessionLog.startedAt = null;
     history.replaceState(null, "", location.pathname + location.search);
@@ -5701,6 +5889,7 @@ Use only standard ASCII characters in your reply \u2014 no curly/smart quotes, n
     const rosterList = [{ id: mesh.myId, name: mesh.myName, mine: true }]
       .concat(Array.from(mesh.roster, ([id, v]) => ({ id, name: v.name, mine: false })));
     wrap.innerHTML = `
+      ${mesh.reconnecting ? `<div class="hint" style="border-color:var(--gilt);background:var(--hl-yellow)">\u21bb ${t("study_reconnecting")}</div>` : ""}
       <div class="hint"><strong>${t("room_code")}: ${mesh.roomCode}</strong><br>${t("study_share_hint")}</div>
       <div style="display:flex;gap:8px;margin-bottom:18px">
         <button class="dl" id="copyLinkBtn" style="flex:1">${t("copy_link")}</button>
